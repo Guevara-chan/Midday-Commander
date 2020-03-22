@@ -25,6 +25,7 @@ when not defined(Meta):
     "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
     "===================================================================",
     "\a\x02ESC:\a\x01    switch between dir view & console view",
+    "\a\x02Home:\a\x01   request new path to browse",
     "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
     "\a\x02F5:\a\x01     copy selected entri(s)",
     "\a\x02F6:\a\x01     move selected entri(s)",
@@ -239,7 +240,8 @@ when not defined(DirViewer):
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
         let prev_dir = path.extractFilename
-        path = path.joinPath(newdir)
+        (path.joinPath(newdir) & "\\").setCurrentDir
+        path = getCurrentDir().normalizedPath
         scroll_to(0).refresh()
         if newdir == direxit.name: scroll_to_name(prev_dir) # Backtrace.
         return self
@@ -454,9 +456,12 @@ when not defined(MultiViewer):
         transfer(self, moveDir, moveFile)
         src_viewer.refresh()
 
-    proc request_dir(self: MultiViewer) =
+    proc request_new_dir(self: MultiViewer) =
         cmdline.request "Input name for new directory", (name: string) => 
             (self.active.path.joinPath(name).createDir; self.active.refresh.scroll_to_name name; self.sync self.active)
+
+    proc request_disk(self: MultiViewer) =
+        cmdline.request "Input path to browse", (path: string) => (discard self.active.chdir path)
 
     proc delete(self: MultiViewer) =
         for idx, entry in self.active.selected_entries:
@@ -483,9 +488,10 @@ when not defined(MultiViewer):
                 if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help: cmdline.record(hint))
                 elif f_key==5 or KEY_F5.IsKeyPressed: copy()
                 elif f_key==6 or KEY_F6.IsKeyPressed: move()
-                elif f_key==7 or KEY_F7.IsKeyPressed: request_dir()
+                elif f_key==7 or KEY_F7.IsKeyPressed: request_new_dir()
                 elif f_key==8 or KEY_F8.IsKeyPressed: delete()
                 elif f_key==10 or KEY_F10.IsKeyPressed:quit()
+                elif KEY_Home.IsKeyPressed: request_disk()
                 elif KEY_Tab.IsKeyPressed:  select(self.next_index)
                 # Viewer update.
                 self.active.update()
