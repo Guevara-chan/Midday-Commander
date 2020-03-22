@@ -6,5 +6,10 @@ It does terminal visuals without terminal and provides retro vibes using latest 
 __Midday Commander__ has been entirelly made for [Nim 1.0.0](https://nim-lang.org) and external [Raylib Forever](https://github.com/Guevara-chan/Raylib-Forever) package by [raysan5](https://github.com/raysan5) and me.  
 Compilation can be achieved through automated build script provided as `release.nims`.
 
+# •Featuræ•
+* Full mouse support.
+* Vintage control buttons layout.
+* OpenGL-powered pseudographics in classical 16-colors palette.
+
 # •Brief sampling of retrofuture management•
 ![Main](https://user-images.githubusercontent.com/8768470/77260966-1ae2f180-6c9c-11ea-9912-7ed729b588a3.png)
