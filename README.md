@@ -8,7 +8,7 @@ Compilation can be achieved through automated build script provided as `release.
 
 # •Featuræ•
 * Full mouse support.
-* Vintage control buttons layout.
+* Vintage control buttons scheme.
 * OpenGL-powered pseudographics in classical 16-colors palette.
 
 # •Brief sampling of retrofuture management•
