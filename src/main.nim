@@ -401,6 +401,7 @@ when not defined(CommandLine):
 # -------------------- #
 when not defined(FileViewer):
     discard "TODO: file viewer"
+    discard "Probably can be extended to editor later"
 # -------------------- #
 when not defined(MultiViewer):
     type MultiViewer = ref object of Area
