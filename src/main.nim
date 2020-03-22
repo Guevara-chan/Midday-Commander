@@ -25,13 +25,13 @@ when not defined(Meta):
     "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
     "===================================================================",
     "\a\x02ESC:\a\x01    switch between dir view & console view",
-    "\a\x02Home:\a\x01   request new path to browse",
     "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
     "\a\x02F5:\a\x01     copy selected entri(s)",
     "\a\x02F6:\a\x01     move selected entri(s)",
     "\a\x02F7:\a\x01     request directory creation",
     "\a\x02F8:\a\x01     delete selected entri(s)",
     "\a\x02Insert:\a\x01 (un)select hilited entry",
+    "\a\x02Home:\a\x01   request new path to browse",
     "\a\x02Left:\a\x01   move to begin of listing",
     "\a\x02Right:\a\x01  move to end of listing",
     "\a\x02Up:\a\x01     move selection/view 1 line up",
@@ -240,7 +240,7 @@ when not defined(DirViewer):
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
         let prev_dir = path.extractFilename
-        (path.joinPath(newdir) & "\\").setCurrentDir
+        ((if path.isAbsolute: newdir else: path.joinPath newdir).normalizedPath & "\\").setCurrentDir
         path = getCurrentDir().normalizedPath
         scroll_to(0).refresh()
         if newdir == direxit.name: scroll_to_name(prev_dir) # Backtrace.
