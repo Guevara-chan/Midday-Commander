@@ -3,7 +3,7 @@ __Midday Commander__ is a pseudographical file managing utility, heaviliy inspir
 It does terminal visuals without terminal and provides retro vibes using latest techologies available.
 
 # •Reassembling•
-__Midday Commander__ has been entirelly made for [Nim 1.0.0](https://nim-lang.org) and external [Raylib Forever](https://github.com/Guevara-chan/Raylib-Forever) package by [raysan5](https://github.com/raysan5) and me.  
+__Midday Commander__ has been entirelly made in [Nim 1.0.0](https://nim-lang.org) with external [Raylib Forever](https://github.com/Guevara-chan/Raylib-Forever) package by [raysan5](https://github.com/raysan5) and me.  
 Compilation can be achieved through automated build script provided as `release.nims`.
 
 # •Featuræ•
