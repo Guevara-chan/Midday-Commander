@@ -240,7 +240,7 @@ when not defined(DirViewer):
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
         let prev_dir = path.extractFilename
-        ((if path.isAbsolute: newdir else: path.joinPath newdir).normalizedPath & "\\").setCurrentDir
+        ((if newdir.isAbsolute: newdir else: path.joinPath newdir).normalizedPath & "\\").setCurrentDir
         path = getCurrentDir().normalizedPath
         scroll_to(0).refresh()
         if newdir == direxit.name: scroll_to_name(prev_dir) # Backtrace.
@@ -432,7 +432,7 @@ when not defined(MultiViewer):
                 let prev_hl = view.hline
                 view.refresh().scroll_to prev_hl
 
-    template transfer(self: MultiViewer, dir_proc: untyped, file_proc: untyped) =
+    template transfer(self: MultiViewer, dir_proc: untyped, file_proc: untyped, destructive = false) =
         var 
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
@@ -442,7 +442,7 @@ when not defined(MultiViewer):
             if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
             self.next_viewer.dirty = true
             last_transferred = entry.name
-            if sel_indexes.len > 0: # Selection removal.
+            if sel_indexes.len > 0 and not destructive: # Selection removal.
                 self.active.switch_selection sel_indexes[0]
                 sel_indexes.delete 0
         self.next_viewer.refresh().scroll_to_name(last_transferred)
@@ -453,7 +453,7 @@ when not defined(MultiViewer):
 
     proc move(self: MultiViewer) =
         let src_viewer = self.active
-        transfer(self, moveDir, moveFile)
+        transfer(self, moveDir, moveFile, true)
         src_viewer.refresh()
 
     proc request_new_dir(self: MultiViewer) =
