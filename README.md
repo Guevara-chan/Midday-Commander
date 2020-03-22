@@ -7,3 +7,4 @@ __Midday Commander__ has been entirelly made for [Nim 1.0.0](https://nim-lang.or
 Compilation can be achieved through automated build script provided as `release.nims`.
 
 # •Brief sampling of retrofuture management•
+![Main](https://user-images.githubusercontent.com/8768470/77260966-1ae2f180-6c9c-11ea-9912-7ed729b588a3.png)
