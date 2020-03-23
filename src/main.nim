@@ -356,8 +356,11 @@ when not defined(CommandLine):
         shell = startProcess("cmd.exe", dir_feed().path, @["/c", command])
         input = ""
 
+    proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
+        if prompt == "": prompt = hint; input = def_input; prompt_cb = cb
+
     proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
-        if prompt == "": prompt = hint; input = ""; prompt_cb = cb
+        request hint, "", cb
 
     proc end_request(self: CommandLine) =
         prompt = ""; input = ""
@@ -377,10 +380,10 @@ when not defined(CommandLine):
         else: # Input controls.
             if input != "":
                 if KEY_Backspace.IsKeyDown: (if norepeat(): input = input.runeSubstr(0, input.len-1))
-                elif KEY_Enter.IsKeyPressed: # Input actualization.
-                    if prompt != "": prompt_cb(input); end_request(); raise newException(OSError, "") # Async query.
-                    else: shell()
-            if KEY_Pause.IsKeyPressed and prompt != "": end_request() # Cancel request mode.
+            if KEY_Enter.IsKeyPressed: # Input actualization.
+                if prompt != "": prompt_cb(input); end_request(); raise newException(OSError, "")
+                elif input != "": shell(); raise newException(OSError, "") # Cancel input handling.
+            elif KEY_Pause.IsKeyPressed and prompt != "": end_request() # Cancel request mode.
             let key = GetKeyPressed()
             if key > 0: input &= $(key.Rune)
         # Output parsing.
@@ -428,10 +431,10 @@ when not defined(MultiViewer):
         current, f_key: int
 
     # --Properties:
-    proc active(self: MultiViewer): DirViewer = viewers[current]
-    proc next_index(self: MultiViewer): int = (current+1) %% viewers.len
-    proc next_viewer(self: MultiViewer): DirViewer = viewers[self.next_index]
-    proc next_path(self: MultiViewer): string = self.next_viewer.path
+    proc active(self: MultiViewer): DirViewer       = viewers[current]
+    proc next_index(self: MultiViewer): int         = (current+1) %% viewers.len
+    proc next_viewer(self: MultiViewer): DirViewer  = viewers[self.next_index]
+    proc next_path(self: MultiViewer): string       = self.next_viewer.path
 
     # --Methods goes here:
     proc select(self: MultiViewer, idx: int = 0) =
@@ -445,13 +448,13 @@ when not defined(MultiViewer):
                 let prev_hl = view.hline
                 view.refresh().scroll_to prev_hl
 
-    template transfer(self: MultiViewer, dir_proc: untyped, file_proc: untyped, destructive = false) =
+    template transfer(self: MultiViewer; dir_proc, file_proc: untyped; destructive = false; ren_pattern = "") =
         var 
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
         for entry in self.active.selected_entries:
             let src = self.active.path / entry.name
-            let dest = self.next_path / entry.name
+            let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
             if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
             self.next_viewer.dirty = true
             last_transferred = entry.name
@@ -464,9 +467,9 @@ when not defined(MultiViewer):
     proc copy(self: MultiViewer) =
         transfer(self, copyDir, copyFile)
 
-    proc move(self: MultiViewer) =
+    proc move(self: MultiViewer, ren_pattern = "") =
         let src_viewer = self.active
-        transfer(self, moveDir, moveFile, true)
+        transfer(self, moveDir, moveFile, true, ren_pattern)
         src_viewer.refresh()
 
     proc request_new_dir(self: MultiViewer) =
@@ -476,6 +479,9 @@ when not defined(MultiViewer):
     proc request_disk(self: MultiViewer) =
         cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) =>
             (discard self.active.chdir path)
+
+    proc request_transfer(self: MultiViewer) =
+        cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
 
     proc delete(self: MultiViewer) =
         for idx, entry in self.active.selected_entries:
@@ -500,11 +506,11 @@ when not defined(MultiViewer):
                     if index-index.int.float < 0.7: f_key = index.int # If click in button bounds - activating.
                 # Keyboard controls.
                 if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help: cmdline.record(hint))
-                elif f_key==5 or KEY_F5.IsKeyPressed: copy()
-                elif f_key==6 or KEY_F6.IsKeyPressed: move()
-                elif f_key==7 or KEY_F7.IsKeyPressed: request_new_dir()
-                elif f_key==8 or KEY_F8.IsKeyPressed: delete()
-                elif f_key==10 or KEY_F10.IsKeyPressed:quit()
+                elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
+                elif f_key==6 or KEY_F6.IsKeyPressed:   request_transfer()
+                elif f_key==7 or KEY_F7.IsKeyPressed:   request_new_dir()
+                elif f_key==8 or KEY_F8.IsKeyPressed:   delete()
+                elif f_key==10 or KEY_F10.IsKeyPressed: quit()
                 elif KEY_Home.IsKeyPressed: request_disk()
                 elif KEY_Tab.IsKeyPressed:  select(self.next_index)
                 # Viewer update.
