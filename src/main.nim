@@ -4,7 +4,7 @@ from unicode import Rune, runes, align, alignLeft, runeSubStr, `==`, `$`, runeLe
 
 #.{ [Classes]
 when not defined(Meta):
-    const cmd_app = when defined(windows): "cmd.exe" else: "TODO"
+    const cmd_app = when defined(windows): "cmd.exe" else: "xterm"
 
     # --Service classes:
     type Area {.inheritable.} = ref object
