@@ -53,6 +53,7 @@ when not defined(Meta):
     "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
     "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
     "\a\x02Shift+Insert:\a\x01 paste clipboard to commandline",
+    "\a\x02Numpad|Enter:\a\x01 invert selections in current dir",
     "==================================================================="]
 # -------------------- #
 when not defined(TerminalEmu):
@@ -278,6 +279,9 @@ when not defined(DirViewer):
         else: sel_stat.dirs += factor
         list[idx] = copy
 
+    proc select_inverted(self: DirViewer) =
+        for idx, entry in list: switch_selection(idx)
+
     method update(self: DirViewer): Area {.discardable.} =
         # Mouse controls.
         if not active: return self
@@ -296,10 +300,11 @@ when not defined(DirViewer):
         elif KEY_Down.IsKeyDown:     (if norepeat(): scroll 1)
         elif KEY_Page_Up.IsKeyDown:  (if norepeat(): scroll -self.capacity)
         elif KEY_Page_Down.IsKeyDown:(if norepeat(): scroll self.capacity)
-        elif KEY_Left.IsKeyPressed:  scroll_to 0
-        elif KEY_Right.IsKeyPressed: scroll_to list.len
-        elif KEY_Enter.IsKeyPressed: invoke self.hentry
+        elif KEY_Left.IsKeyPressed:   scroll_to 0
+        elif KEY_Right.IsKeyPressed:  scroll_to list.len
+        elif KEY_Enter.IsKeyPressed:  invoke self.hentry
         elif KEY_Insert.IsKeyPressed: switch_selection(hline); scroll 1
+        elif KEY_KP_Enter.IsKeyPressed: select_inverted()
         # Finalization.
         return self
 
