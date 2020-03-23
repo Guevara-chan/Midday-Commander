@@ -1,14 +1,12 @@
-import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, raylib
+import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings, raylib
 from unicode import Rune, runes, align, alignLeft, runeSubStr, `==`, `$`, runeLen
 {.this: self.}
 
 #.{ [Classes]
 when not defined(Meta):
-    # --API:
-    when defined(windows):
-        proc get_console_window(): cint                     {.stdcall, dynlib: "kernel32", importc: "GetConsoleWindow".}
-        proc show_window(win: int, flags: int): cint        {.stdcall, dynlib: "user32",   importc: "ShowWindow".}
-        discard get_console_window().show_window false.int # Console is mandatory for Windows.
+    # --Constants.
+    const cmd_cp = when defined(windows): "cp866"
+    else: "utf-8"
 
     # --Service classes:
     type Area {.inheritable.} = ref object
@@ -41,7 +39,7 @@ when not defined(Meta):
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
-    "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.01",
+    "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.02",
     "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
     "===================================================================",
     "\a\x02ESC:\a\x01    switch between dir view & console view OR deny alert choice",
@@ -380,7 +378,7 @@ when not defined(CommandLine):
         let command = (if cmd != "": cmd else: input)
         record(&"\a\x03>>\a\x04{command}")
         shell = when defined(windows): 
-            startProcess "cmd.exe", dir_feed().path, @["/c", command], nil, {poStdErrToStdOut}
+              startProcess "cmd.exe",   dir_feed().path, @["/c", command], nil, {poStdErrToStdOut, poDaemon}
         else: startProcess "/bin/bash", dir_feed().path, @[command, "|| exit"]
         input = ""
 
@@ -405,9 +403,10 @@ when not defined(CommandLine):
         # Deferred output handling.
         defer: 
             if not shell.isNil and shell.hasData: 
-                record(shell.outputStream.readLine())
+                record shell.outputStream.readLine.convert(srcEncoding = cmd_cp)
                 if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
         if self.exclusive: # Scrolling controls.
+            scroll -GetMouseWheelMove()
             if KEY_PageUp.IsKeyDown:      (if norepeat(): scroll -host.vlines)
             elif KEY_PageDown.IsKeyDown:  (if norepeat(): scroll +host.vlines)
             elif KEY_Up.IsKeyDown:        (if norepeat(): scroll -1)
