@@ -371,6 +371,11 @@ when not defined(CommandLine):
         if y == 0 and x >= host.hlines() - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
             fullscreen = false
         if KEY_Escape.IsKeyPressed: fullscreen = not fullscreen
+        # Deferred output handling.
+        defer: 
+            if not shell.isNil and shell.hasData: 
+                record(shell.outputStream.readLine())
+                if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
         if self.exclusive: # Scrolling controls.
             if KEY_PageUp.IsKeyDown:      (if norepeat(): scroll -host.vlines)
             elif KEY_PageDown.IsKeyDown:  (if norepeat(): scroll +host.vlines)
@@ -386,10 +391,7 @@ when not defined(CommandLine):
             elif KEY_Pause.IsKeyPressed and prompt != "": end_request() # Cancel request mode.
             let key = GetKeyPressed()
             if key > 0: input &= $(key.Rune)
-        # Output parsing.
-        if not shell.isNil and shell.hasData: 
-            record(shell.outputStream.readLine())
-            if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
+        # Finalization.
         return self
 
     method render(self: CommandLine): Area {.discardable.} =
