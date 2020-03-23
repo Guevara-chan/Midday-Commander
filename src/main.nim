@@ -52,8 +52,8 @@ when not defined(Meta):
     "\a\x02PgDown:\a\x01 move selection/view 1 page down",
     "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
     "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
-    "\a\x02Shift+Insert:\a\x01 paste clipboard to commandline",
-    "\a\x02Numpad|Enter:\a\x01 invert selections in current dir",
+    "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
+    "\a\x07Numpad|\a\x02Enter:\a\x01 invert selections in current dir",
     "==================================================================="]
 # -------------------- #
 when not defined(TerminalEmu):
