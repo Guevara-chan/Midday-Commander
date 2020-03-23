@@ -18,6 +18,11 @@ when not defined(Meta):
     proc root_dir(path: string): string =
         var child = path
         while true: (if child.parentDir == "": return child else: child = child.parentDir)
+    proc drive_list(): seq[string] =
+        when defined(windows):
+            for drive in execCmdEx("wmic logicaldisk get caption,Access").output.splitLines[1..^1].filterIt(it!=""):
+                if drive[0] != ' ': result.add drive.subStr(4).strip()
+        else: @[]
 
     # --Data
     const help = @["\a\x03>\a\x01.",
@@ -461,7 +466,8 @@ when not defined(MultiViewer):
             (self.active.path.joinPath(name).createDir; self.active.refresh.scroll_to_name name; self.sync self.active)
 
     proc request_disk(self: MultiViewer) =
-        cmdline.request "Input path to browse", (path: string) => (discard self.active.chdir path)
+        cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) =>
+            (discard self.active.chdir path)
 
     proc delete(self: MultiViewer) =
         for idx, entry in self.active.selected_entries:
@@ -502,7 +508,7 @@ when not defined(MultiViewer):
             # Finalization.
             if (getTime() - error.time).inSeconds > 2: error.msg = ""
         except: # Error message
-            error = (msg: getCurrentExceptionMsg().split('\n')[0], time: getTime())
+            error = (msg: getCurrentExceptionMsg().splitLines[0], time: getTime())
             for viewer in viewers: (if viewer.dirty: viewer.refresh().scroll_to(viewer.hline))
         return self
 
