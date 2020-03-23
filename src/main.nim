@@ -415,7 +415,7 @@ when not defined(CommandLine):
             elif KEY_Pause.IsKeyPressed:  (if self.running: shell.kill)
         else: # Input controls.
             if input != "": # Backspace only if there are text to remove.
-                if KEY_Backspace.IsKeyDown: (if norepeat(): input = input.runeSubstr(0, input.len-1))
+                if KEY_Backspace.IsKeyDown: (if norepeat(): input = input.runeSubstr(0, input.runeLen-1))
             if KEY_Enter.IsKeyPressed: # Input actualization.
                 if prompt != "": prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
             elif KEY_Pause.IsKeyPressed and prompt != "": end_request(); abort() # Cancel request mode.
