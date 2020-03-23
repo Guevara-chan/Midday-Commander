@@ -457,7 +457,7 @@ when not defined(MultiViewer):
             let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
             if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
             self.next_viewer.dirty = true
-            last_transferred = entry.name
+            last_transferred = dest.extractFilename
             if sel_indexes.len > 0 and not destructive: # Selection removal.
                 self.active.switch_selection sel_indexes[0]
                 sel_indexes.delete 0
