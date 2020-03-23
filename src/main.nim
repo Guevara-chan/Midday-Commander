@@ -13,6 +13,8 @@ when not defined(Meta):
         if (getTime() - repeater).inMilliseconds > 110: repeater = getTime(); return true
 
     # --Service procs:
+    proc control_down(): bool = KEY_Left_Control.IsKeyDown() or KEY_Right_Control.IsKeyDown()
+    proc shift_down(): bool = KEY_Left_Shift.IsKeyDown() or KEY_Right_Shift.IsKeyDown()
     proc fit(txt: string, size: int, filler = ' '): string = txt.align(size, filler.Rune).runeSubStr 0, size
     proc fit_left(txt: string, size: int, filler = ' '): string = txt.alignLeft(size, filler.Rune).runeSubStr 0, size
     proc root_dir(path: string): string =
@@ -50,6 +52,7 @@ when not defined(Meta):
     "\a\x02PgDown:\a\x01 move selection/view 1 page down",
     "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
     "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
+    "\a\x02Shift+Insert:\a\x01 paste clipboard to commandline",
     "==================================================================="]
 # -------------------- #
 when not defined(TerminalEmu):
@@ -369,8 +372,13 @@ when not defined(CommandLine):
     proc end_request(self: CommandLine) =
         prompt = ""; input = ""; conf_cb = nil
 
+    proc paste(self: CommandLine, text: string) =
+        input &= text
+
     method update(self: CommandLine): Area {.discardable.} =
         # Service controls.
+        let abort = proc() = 
+            raise newException(OSError, "")
         let (x, y) = host.pick(GetMouseX(), GetMouseY())
         if y == 0 and x >= host.hlines() - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
             fullscreen = false
@@ -387,14 +395,14 @@ when not defined(CommandLine):
             elif KEY_Down.IsKeyDown:      (if norepeat(): scroll 1)
             elif KEY_Pause.IsKeyPressed:  (if self.running: shell.kill)
         else: # Input controls.
-            if input != "":
+            if input != "": # Backspace only if there are text to remove.
                 if KEY_Backspace.IsKeyDown: (if norepeat(): input = input.runeSubstr(0, input.len-1))
             if KEY_Enter.IsKeyPressed: # Input actualization.
-                if prompt != "": prompt_cb(input); end_request(); raise newException(OSError, "")
-                elif input != "": shell(); raise newException(OSError, "") # Cancel input handling.
-            elif KEY_Pause.IsKeyPressed and prompt != "": end_request() # Cancel request mode.
+                if prompt != "": prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
+            elif KEY_Pause.IsKeyPressed and prompt != "": end_request(); abort() # Cancel request mode.
+            elif shift_down() and KEY_Insert.IsKeyPressed: paste $GetClipboardText(); abort()
             let key = GetKeyPressed()
-            if key > 0: input &= $(key.Rune)
+            if key > 0: paste($(key.Rune))
         # Finalization.
         return self
 
