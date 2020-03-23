@@ -513,12 +513,14 @@ when not defined(MultiViewer):
                     #echo "?"
                     if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
                     self.next_viewer.dirty = true
+                    if destructive: self.active.dirty = true
                     last_transferred = dest.extractFilename
             if sel_indexes.len > 0 and not destructive: # Selection removal.
                 self.active.switch_selection sel_indexes[0]
                 sel_indexes.delete 0
-        self.next_viewer.refresh().scroll_to_name(last_transferred)
-        select self.next_index
+        if self.next_viewer.dirty: # Only if any changes happened.
+            self.next_viewer.refresh().scroll_to_name(last_transferred)
+            select self.next_index
 
     proc copy(self: MultiViewer) =
         transfer(self, copyDir, copyFile)
