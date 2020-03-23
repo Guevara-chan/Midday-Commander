@@ -268,7 +268,7 @@ when not defined(DirViewer):
         return self
 
     proc exec(self: DirViewer, fname: string) =
-        discard execShellCmd path / (self.hentry.name).quoteShell
+        discard execShellCmd (path / self.hentry.name).quoteShell
 
     proc invoke(self: DirViewer, entry: DirEntry) =
         if entry.is_dir: chdir(entry.name) else: spawn exec(entry.name)
