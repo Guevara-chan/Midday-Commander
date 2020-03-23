@@ -13,6 +13,7 @@ when not defined(Meta):
         if (getTime() - repeater).inMilliseconds > 110: repeater = getTime(); return true
 
     # --Service procs:
+    proc abort() = raise newException(OSError, "")
     proc control_down(): bool = KEY_Left_Control.IsKeyDown() or KEY_Right_Control.IsKeyDown()
     proc shift_down(): bool = KEY_Left_Shift.IsKeyDown() or KEY_Right_Shift.IsKeyDown()
     proc fit(txt: string, size: int, filler = ' '): string = txt.align(size, filler.Rune).runeSubStr 0, size
@@ -145,9 +146,9 @@ when not defined(TerminalEmu):
         # Font setup.
         var glyphs: array[486, int]
         for i in 0..glyphs.high: glyphs[i] = i
-        let extra_chars = 
-            @[0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0xB7,0xB0,0xA0] &
-                lc[x | (x <- 0x410..0x451), int]
+        let extra_chars = @[
+            0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0xB7,0xB0,0xA0
+                ] & lc[x | (x <- 0x410..0x451), int]
         glyphs[0x80..0x80+extra_chars.len-1] = extra_chars
         # Terminal object.
         result = TerminalEmu(font:"res/TerminalVector.ttf".LoadFontEx(12,glyphs.addr,glyphs.len), palette:colors.toSeq)
@@ -352,7 +353,6 @@ when not defined(CommandLine):
         fullscreen: bool
         dir_feed:   proc(): DirViewer
         prompt_cb:  proc(name: string)
-        conf_cb:    proc(confirm: bool)
         input, prompt: string
     const max_log = 99999
     const exit_hint = " ESC to return "
@@ -380,19 +380,14 @@ when not defined(CommandLine):
     proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
         request hint, "", cb
 
-    proc request_confirmation(self: CommandLine, hint: string, cb: proc) =
-        if prompt == "": prompt = $"{hint} \a\x03<y/n>"; conf_cb = cb
-
     proc end_request(self: CommandLine) =
-        prompt = ""; input = ""; conf_cb = nil
+        prompt = ""; input = "";
 
     proc paste(self: CommandLine, text: string) =
         input &= text
 
     method update(self: CommandLine): Area {.discardable.} =
         # Service controls.
-        let abort = proc() = 
-            raise newException(OSError, "")
         let (x, y) = host.pick(GetMouseX(), GetMouseY())
         if y == 0 and x >= host.hlines() - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
             fullscreen = false
@@ -445,9 +440,35 @@ when not defined(CommandLine):
     proc newCommandLine(term: TerminalEmu, dir_feeder: proc(): DirViewer): CommandLine =
         result = CommandLine(host: term, dir_feed: dir_feeder)
 # -------------------- #
-when not defined(FileViewer):
+when not defined(Alert):
     discard "TODO: file viewer"
     discard "Probably can be extended to editor later"
+    type Alert = ref object of Area
+        host:    TerminalEmu
+        parent:  Area
+        message: string
+        answer:  int
+
+    # --Methods goes here:
+    method update(self: Alert): Area {.discardable.} =
+        case $(GetKeyPressed().Rune)
+            of "n", "N": abort()
+            of "y", "Y": answer = 1; abort()
+        return self
+
+    method render(self: Alert): Area {.discardable.} =
+        parent.render()
+        host.margin = 0
+        host.loc(0, host.vlines() div 2 - 3)
+        let delim = "█ ".repeat host.hlines div 2
+        host.write @[delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", message.center(host.hlines), "\n\a\x03", 
+            "<Yes/No>".center(host.hlines), "\n\a\x08 ", delim], MAROON, BLACK
+        return self
+
+    proc newAlert(term: TerminalEmu, creator: Area, msg: string): Alert =
+        result = Alert(host: term, parent: creator, message: &"{msg} ?")
+        try: result.host.loop_with result
+        except: discard
 # -------------------- #
 when not defined(MultiViewer):
     type MultiViewer = ref object of Area
@@ -476,6 +497,12 @@ when not defined(MultiViewer):
                 let prev_hl = view.hline
                 view.refresh().scroll_to prev_hl
 
+    proc warn(self: MultiViewer, message: string): int =
+        return newAlert(host, self, message).answer
+
+    proc navigate(self: MultiViewer, path: string) =
+        discard self.active.chdir path
+
     template transfer(self: MultiViewer; dir_proc, file_proc: untyped; destructive = false; ren_pattern = "") =
         var 
             last_transferred: string
@@ -500,16 +527,10 @@ when not defined(MultiViewer):
         transfer(self, moveDir, moveFile, true, ren_pattern)
         src_viewer.refresh()
 
-    proc request_new_dir(self: MultiViewer) =
-        cmdline.request "Input name for new directory", (name: string) => 
-            (self.active.path.joinPath(name).createDir; self.active.refresh.scroll_to_name name; self.sync self.active)
-
-    proc request_disk(self: MultiViewer) =
-        cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) =>
-            (discard self.active.chdir path)
-
-    proc request_transfer(self: MultiViewer) =
-        cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
+    proc new_dir(self: MultiViewer, name: string) =
+        self.active.path.joinPath(name).createDir
+        self.active.refresh.scroll_to_name name
+        sync self.active
 
     proc delete(self: MultiViewer) =
         for idx, entry in self.active.selected_entries:
@@ -518,6 +539,18 @@ when not defined(MultiViewer):
             self.active.dirty = true
         self.active.refresh()
         sync(self.active)
+
+    proc request_navigation(self: MultiViewer) =
+        cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) => self.navigate path
+
+    proc request_transfer(self: MultiViewer) =
+        cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
+
+    proc request_new_dir(self: MultiViewer) =
+        cmdline.request "Input name for new directory", (name: string) => self.new_dir (name)
+
+    proc request_deletion(self: MultiViewer) =
+        if warn(&"Are you sure want to delete {self.active.selected_entries.len} entris") >= 1: delete()
 
     method update(self: MultiViewer): Area {.discardable.} =
         f_key = 0 # F-key emulator.
@@ -537,9 +570,9 @@ when not defined(MultiViewer):
                 elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
                 elif f_key==6 or KEY_F6.IsKeyPressed:   request_transfer()
                 elif f_key==7 or KEY_F7.IsKeyPressed:   request_new_dir()
-                elif f_key==8 or KEY_F8.IsKeyPressed:   delete()
+                elif f_key==8 or KEY_F8.IsKeyPressed:   request_deletion()
                 elif f_key==10 or KEY_F10.IsKeyPressed: quit()
-                elif KEY_Home.IsKeyPressed: request_disk()
+                elif KEY_Home.IsKeyPressed: request_navigation()
                 elif KEY_Tab.IsKeyPressed:  select(self.next_index)
                 # Viewer update.
                 self.active.update()
@@ -582,6 +615,6 @@ when not defined(MultiViewer):
 # ==Main code==
 when isMainModule:
     let 
-        win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color)
+        win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win, viewer_width))
     win.loop_with supervisor
