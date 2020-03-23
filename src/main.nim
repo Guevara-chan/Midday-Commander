@@ -332,9 +332,10 @@ when not defined(CommandLine):
         log:    seq[string]
         shell:  Process
         origin: int
+        fullscreen: bool
         dir_feed:   proc(): DirViewer
         prompt_cb:  proc(name: string)
-        fullscreen: bool
+        conf_cb:    proc(confirm: bool)
         input, prompt: string
     const max_log = 99999
     const exit_hint = " ESC to return "
@@ -362,8 +363,11 @@ when not defined(CommandLine):
     proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
         request hint, "", cb
 
+    proc request_confirmation(self: CommandLine, hint: string, cb: proc) =
+        if prompt == "": prompt = $"{hint} \a\x03<y/n>"; conf_cb = cb
+
     proc end_request(self: CommandLine) =
-        prompt = ""; input = ""
+        prompt = ""; input = ""; conf_cb = nil
 
     method update(self: CommandLine): Area {.discardable.} =
         # Service controls.
