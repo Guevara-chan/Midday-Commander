@@ -448,11 +448,24 @@ when not defined(Alert):
         message: string
         answer:  int
 
+    # --Properties:
+    proc ypos(self: Alert): int = host.vlines() div 2 - 3
+
     # --Methods goes here:
     method update(self: Alert): Area {.discardable.} =
-        var input = $(GetKeyPressed().Rune)
-        if KEY_Escape.IsKeyPressed:  input = "n"
-        elif KEY_Space.IsKeyPressed: input = "y"
+        # Mouse controls.
+        var input = if MOUSE_Left_Button.IsMouseButtonReleased:
+            let h_center = host.hlines div 2
+            let (x, y) = host.pick(GetMouseX(), GetMouseY())
+            if   y == self.ypos + 1 and x >= h_center - 1 and x <= h_center + 1: "n"
+            elif y == self.ypos + 3 and x >= h_center - 3 and x <= h_center - 1: "y"
+            elif y == self.ypos + 3 and x >= h_center + 1 and x <= h_center + 3: "n"
+            else: " "
+        # Keyboard controls
+        elif KEY_Escape.IsKeyPressed: "n"
+        elif KEY_Space.IsKeyPressed:  "y"
+        else: $(GetKeyPressed().Rune)
+        # Finalization.
         case input
             of "n", "N": abort()
             of "y", "Y": answer = 1; abort()
@@ -461,8 +474,8 @@ when not defined(Alert):
     method render(self: Alert): Area {.discardable.} =
         parent.render()
         host.margin = 0
-        host.loc(0, host.vlines() div 2 - 3)
         let delim = "█ ".repeat host.hlines div 2
+        host.loc(0, self.ypos)        
         host.write @[delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", message.center(host.hlines), "\n\a\x03", 
             "<Yes/No>".center(host.hlines), "\n\a\x08 ", delim], MAROON, BLACK
         return self
