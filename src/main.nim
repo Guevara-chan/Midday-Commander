@@ -29,8 +29,9 @@ when not defined(Meta):
         while true: (if child.parentDir == "": return child else: child = child.parentDir)
     proc drive_list(): seq[string] =
         when defined(windows):
-            for drive in execCmdEx("wmic logicaldisk get caption,Access").output.splitLines[1..^1].filterIt(it!=""):
-                if drive[0] != ' ': result.add drive.subStr(4).strip()
+            for drive in execCmdEx("wmic logicaldisk get caption,Access", {poDaemon}).output.splitLines[1..^1]
+                .filterIt(it!=""):
+                    if drive[0] != ' ': result.add drive.subStr(4).strip()
         else: @[]
     proc wildcard_replace(path: string, pattern = "*.*"): string =
         let
@@ -378,8 +379,9 @@ when not defined(CommandLine):
     proc shell(self: CommandLine, cmd: string = "") =
         let command = (if cmd != "": cmd else: input)
         record(&"\a\x03>>\a\x04{command}")
-        shell = when defined(windows): startProcess "cmd.exe", dir_feed().path, @["/c", command]
-                else: startProcess "/bin/bash", dir_feed().path, @[command, "|| exit"]
+        shell = when defined(windows): 
+            startProcess "cmd.exe", dir_feed().path, @["/c", command], nil, {poStdErrToStdOut}
+        else: startProcess "/bin/bash", dir_feed().path, @[command, "|| exit"]
         input = ""
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
