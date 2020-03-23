@@ -4,6 +4,12 @@ from unicode import Rune, runes, align, alignLeft, runeSubStr, `==`, `$`, runeLe
 
 #.{ [Classes]
 when not defined(Meta):
+    # --API:
+    when defined(windows):
+        proc get_console_window(): cint                     {.stdcall, dynlib: "kernel32", importc: "GetConsoleWindow".}
+        proc show_window(win: int, flags: int): cint        {.stdcall, dynlib: "user32",   importc: "ShowWindow".}
+        discard get_console_window().show_window false.int # Console is mandatory for Windows.
+
     # --Service classes:
     type Area {.inheritable.} = ref object
         repeater, clicker: Time
