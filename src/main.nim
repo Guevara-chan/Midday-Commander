@@ -279,12 +279,12 @@ when not defined(DirViewer):
         if entry.is_dir: chdir(entry.name) else: exec(entry.name)
 
     proc switch_selection(self: DirViewer, idx: int, state = -1) =
-        var copy = list[idx]
-        copy.selected = if state < 0: not copy.selected else: state.bool
-        let factor = if copy.selected: 1 else: -1 # Updating stat.
-        if not copy.is_dir: sel_stat.bytes += copy.size * factor; sel_stat.files += factor
+        var entry = list[idx]
+        entry.selected = if state < 0: not entry.selected else: state.bool
+        let factor = if entry.selected: 1 else: -1 # Updating stat.
+        if not entry.is_dir: sel_stat.bytes += entry.size * factor; sel_stat.files += factor
         else: sel_stat.dirs += factor
-        list[idx] = copy
+        list[idx] = entry
 
     proc select_inverted(self: DirViewer) =
         for idx, entry in list: switch_selection(idx)
