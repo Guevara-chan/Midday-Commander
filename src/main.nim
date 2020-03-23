@@ -398,7 +398,7 @@ when not defined(CommandLine):
         host.margin = -2
         if prompt != "": host.write @[prompt, "\a\x06"], BLACK, ORANGE
         else: host.write @[dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
-        let prefix_len = host.hpos() + 2
+        let prefix_len = host.hpos() + 2 # 2 - for additonal symbol and pointer.
         let full_len = prefix_len + input.runeLen
         host.write @[if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines(): "…" else: " ",
             if full_len >= host.hlines(): input.runeSubstr(-(host.hlines()-prefix_len-2)) else: input, 
