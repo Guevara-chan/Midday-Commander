@@ -441,8 +441,6 @@ when not defined(CommandLine):
         result = CommandLine(host: term, dir_feed: dir_feeder)
 # -------------------- #
 when not defined(Alert):
-    discard "TODO: file viewer"
-    discard "Probably can be extended to editor later"
     type Alert = ref object of Area
         host:    TerminalEmu
         parent:  Area
@@ -510,9 +508,12 @@ when not defined(MultiViewer):
         for entry in self.active.selected_entries:
             let src = self.active.path / entry.name
             let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
-            if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
-            self.next_viewer.dirty = true
-            last_transferred = dest.extractFilename
+            if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
+                warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
+                    #echo "?"
+                    if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
+                    self.next_viewer.dirty = true
+                    last_transferred = dest.extractFilename
             if sel_indexes.len > 0 and not destructive: # Selection removal.
                 self.active.switch_selection sel_indexes[0]
                 sel_indexes.delete 0
