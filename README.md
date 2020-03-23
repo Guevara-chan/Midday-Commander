@@ -1,6 +1,6 @@
 # •Sum•
 __Midday Commander__ is a pseudographical file managing utility, heaviliy inspired by [FAR](https://github.com/FarGroup/FarManager) and [VC](https://web.archive.org/web/20070929061041/http://www.egner-online.de/vc/en/intro.shtml) design.  
-It does terminal visuals without terminal and provides retro vibes using latest techologies available.
+It does terminal visuals without terminal and provides retro vibes using latest techologies available.  
 __Latest version:__ https://github.com/Guevara-chan/Midday-Commander/releases/download/0.01/Midday.Commander.zip (direct link)
 
 # •Reassembling•
