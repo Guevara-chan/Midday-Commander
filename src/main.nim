@@ -23,6 +23,11 @@ when not defined(Meta):
             for drive in execCmdEx("wmic logicaldisk get caption,Access").output.splitLines[1..^1].filterIt(it!=""):
                 if drive[0] != ' ': result.add drive.subStr(4).strip()
         else: @[]
+    proc wildcard_replace(path: string, pattern = "*.*"): string =
+        let
+            (dir, name, ext) = path.splitFile
+            mask = pattern.splitFile
+        dir / (mask.name.replace("*", name) & mask.ext.replace("*", ext.runeSubstr(ext.searchExtPos-1)))
 
     # --Data
     const help = @["\a\x03>\a\x01.",
@@ -150,7 +155,7 @@ when not defined(DirEntry):
         size: BiggestInt
         mtime: Time
         selected: bool
-    const direxit = DirEntry(name: "..", kind: pcDir)
+    const direxit = DirEntry(name: ParDir, kind: pcDir)
 
     # --Properties:
     proc executable(self: DirEntry): bool =
@@ -170,7 +175,7 @@ when not defined(DirEntry):
     template is_dir(self: DirEntry): bool = self.kind in [pcDir, pcLinkToDir]
     proc `$`(self: DirEntry): string = (if self.is_dir: "/" elif self.executable: "*" else: " ") & name
     template get_size(self: DirEntry): string =
-        if self.name == direxit.name: "\xB7\x10UP--DIR\x11\xB7"
+        if self.name == ParDir:       "\xB7\x10UP--DIR\x11\xB7"
         elif self.is_dir:             "\xB7\x10SUB-DIR\x11\xB7"
         elif self.name == "":         ""
         elif self.size > 99999999999: $(self.size div 1024) & "K"
@@ -245,14 +250,14 @@ when not defined(DirViewer):
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
         let prev_dir = path.extractFilename
-        ((if newdir.isAbsolute: newdir else: path.joinPath newdir).normalizedPath & "\\").setCurrentDir
+        ((if newdir.isAbsolute: newdir else: path / newdir).normalizedPath & DirSep).setCurrentDir
         path = getCurrentDir().normalizedPath
         scroll_to(0).refresh()
-        if newdir == direxit.name: scroll_to_name(prev_dir) # Backtrace.
+        if newdir == ParDir: scroll_to_name(prev_dir) # Backtrace.
         return self
 
     proc exec(self: DirViewer, fname: string) =
-        discard execShellCmd path.joinPath(self.hentry.name).quoteShell
+        discard execShellCmd path / (self.hentry.name).quoteShell
 
     proc invoke(self: DirViewer, entry: DirEntry) =
         if entry.is_dir: chdir(entry.name) else: spawn exec(entry.name)
@@ -445,8 +450,8 @@ when not defined(MultiViewer):
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
         for entry in self.active.selected_entries:
-            let src = self.active.path.joinPath entry.name
-            let dest = self.next_path.joinPath entry.name
+            let src = self.active.path / entry.name
+            let dest = self.next_path / entry.name
             if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
             self.next_viewer.dirty = true
             last_transferred = entry.name
@@ -474,7 +479,7 @@ when not defined(MultiViewer):
 
     proc delete(self: MultiViewer) =
         for idx, entry in self.active.selected_entries:
-            let victim = self.active.path.joinPath entry.name
+            let victim = self.active.path / entry.name
             if entry.is_dir: victim.removeDir() else: victim.removeFile()
             self.active.dirty = true
         self.active.refresh()
