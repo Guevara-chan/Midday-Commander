@@ -4,6 +4,8 @@ from unicode import Rune, runes, align, alignLeft, runeSubStr, `==`, `$`, runeLe
 
 #.{ [Classes]
 when not defined(Meta):
+    const cmd_app = when defined(windows): "cmd.exe" else: "TODO"
+
     # --Service classes:
     type Area {.inheritable.} = ref object
         repeater, clicker: Time
@@ -32,7 +34,7 @@ when not defined(Meta):
             mask = pattern.splitFile
         dir / (mask.name.replace("*", name) & mask.ext.replace("*", ext.runeSubstr(ext.searchExtPos-1)))
 
-    # --Data
+    # --Data:
     const help = @["\a\x03>\a\x01.",
     "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.01",
     "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
@@ -372,7 +374,7 @@ when not defined(CommandLine):
     proc shell(self: CommandLine, cmd: string = "") =
         let command = (if cmd != "": cmd else: input)
         record(&"\a\x03>>\a\x04{command}")
-        shell = startProcess("cmd.exe", dir_feed().path, @["/c", command])
+        shell = startProcess(cmd_app, dir_feed().path, @["/c", command])
         input = ""
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
