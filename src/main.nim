@@ -123,6 +123,9 @@ when not defined(TerminalEmu):
         #DrawFPS(0,0)
         EndDrawing()
 
+    proc loop_with(self: TerminalEmu, areas: varargs[Area]) = 
+        while not WindowShouldClose(): update areas
+
     proc newTerminalEmu(colors: varargs[Color]): TerminalEmu =
         # Init setup.
         InitWindow(880, 400, "Midday Commander")
@@ -188,7 +191,7 @@ when not defined(DirEntry):
             mtime: src.path.getLastModificationTime)
 # -------------------- #
 when not defined(DirViewer):
-    type BreakDown = ref object
+    type BreakDown = object
         files, dirs, bytes: BiggestInt
     type DirViewer = ref object of Area
         host: TerminalEmu
@@ -326,7 +329,7 @@ when not defined(DirViewer):
         host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
         host.write @[($hentry()).fit_left(total_width), "\a\x01║\n"], hentry().coloring
-        let (stat_feed, clr) = if sel_stat.files > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
+        let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
         let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
         host.write ["╚", total_size.center(total_width+4, '-').replace("-", "═"), "╝"]
         # Finalization.
@@ -576,4 +579,4 @@ when isMainModule:
     let 
         win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win, viewer_width))
-    while not WindowShouldClose(): win.update supervisor
+    win.loop_with supervisor
