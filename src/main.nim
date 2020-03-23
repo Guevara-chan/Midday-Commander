@@ -541,7 +541,8 @@ when not defined(MultiViewer):
 #.}
 
 # ==Main code==
-let 
-    win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE)
-    supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win, viewer_width))
-while not WindowShouldClose(): win.update supervisor
+when isMainModule:
+    let 
+        win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE)
+        supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win, viewer_width))
+    while not WindowShouldClose(): win.update supervisor
