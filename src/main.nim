@@ -37,12 +37,13 @@ when not defined(Meta):
     "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.01",
     "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
     "===================================================================",
-    "\a\x02ESC:\a\x01    switch between dir view & console view",
+    "\a\x02ESC:\a\x01    switch between dir view & console view OR deny alert choice",
     "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
     "\a\x02F5:\a\x01     copy selected entri(s)",
     "\a\x02F6:\a\x01     move selected entri(s)",
     "\a\x02F7:\a\x01     request directory creation",
     "\a\x02F8:\a\x01     delete selected entri(s)",
+    "\a\x02Space:\a\x01  confirm alert choice",
     "\a\x02Insert:\a\x01 (un)select hilited entry",
     "\a\x02Home:\a\x01   request new path to browse",
     "\a\x02Left:\a\x01   move to begin of listing",
@@ -449,7 +450,10 @@ when not defined(Alert):
 
     # --Methods goes here:
     method update(self: Alert): Area {.discardable.} =
-        case $(GetKeyPressed().Rune)
+        var input = $(GetKeyPressed().Rune)
+        if KEY_Escape.IsKeyPressed:  input = "n"
+        elif KEY_Space.IsKeyPressed: input = "y"
+        case input
             of "n", "N": abort()
             of "y", "Y": answer = 1; abort()
         return self
@@ -510,7 +514,6 @@ when not defined(MultiViewer):
             let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
             if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
                 warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
-                    #echo "?"
                     if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
                     self.next_viewer.dirty = true
                     if destructive: self.active.dirty = true
