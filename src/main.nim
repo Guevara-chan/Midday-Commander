@@ -188,12 +188,14 @@ when not defined(DirEntry):
             mtime: src.path.getLastModificationTime)
 # -------------------- #
 when not defined(DirViewer):
+    type BreakDown = ref object
+        files, dirs, bytes: BiggestInt
     type DirViewer = ref object of Area
         host: TerminalEmu
         path: string
         list: seq[DirEntry]
-        dir_size: BiggestInt
         dirty, active, visible: bool
+        dir_stat, sel_stat: BreakDown
         hline, origin, xoffset, file_count: int
     const
         hdr_height      = 2
@@ -242,10 +244,10 @@ when not defined(DirViewer):
 
     proc refresh(self: DirViewer): auto {.discardable.} =
         let last_hl = hline # To return for hl position later.
-        dir_size = 0; file_count = 0; list.setLen(0)
+        dir_stat = Breakdown(); sel_stat = BreakDown(); list.setLen(0)
         for record in walkDir(path): 
             let entry = newDirEntry record
-            if not entry.is_dir: dir_size += entry.size; file_count.inc
+            if not entry.is_dir: dir_stat.bytes += entry.size; dir_stat.files.inc else: dir_stat.dirs.inc
             list.add entry
         if not path.isRootDir: list.insert(direxit, 0) # .. entry.
         dirty = false
@@ -265,9 +267,12 @@ when not defined(DirViewer):
     proc invoke(self: DirViewer, entry: DirEntry) =
         if entry.is_dir: chdir(entry.name) else: spawn exec(entry.name)
 
-    proc switch_selection(self: DirViewer, idx: int) =
+    proc switch_selection(self: DirViewer, idx: int, state = -1) =
         var copy = list[idx]
-        copy.selected = not copy.selected
+        copy.selected = if state < 0: not copy.selected else: state.bool
+        let factor = if copy.selected: 1 else: -1 # Updating stat.
+        if not copy.is_dir: sel_stat.bytes += copy.size * factor; sel_stat.files += factor
+        else: sel_stat.dirs += factor
         list[idx] = copy
 
     method update(self: DirViewer): Area {.discardable.} =
@@ -321,7 +326,8 @@ when not defined(DirViewer):
         host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
         host.write @[($hentry()).fit_left(total_width), "\a\x01║\n"], hentry().coloring
-        let total_size = &" \a\x05{($dir_size).insertSep(' ', 3)} bytes in {file_count} files\a\x01 "
+        let (stat_feed, clr) = if sel_stat.files > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
+        let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
         host.write ["╚", total_size.center(total_width+4, '-').replace("-", "═"), "╝"]
         # Finalization.
         return self
@@ -568,6 +574,6 @@ when not defined(MultiViewer):
 # ==Main code==
 when isMainModule:
     let 
-        win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE)
+        win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win, viewer_width))
     while not WindowShouldClose(): win.update supervisor
