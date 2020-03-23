@@ -4,8 +4,6 @@ from unicode import Rune, runes, align, alignLeft, runeSubStr, `==`, `$`, runeLe
 
 #.{ [Classes]
 when not defined(Meta):
-    const cmd_app = when defined(windows): "cmd.exe" else: "xterm"
-
     # --Service classes:
     type Area {.inheritable.} = ref object
         repeater, clicker: Time
@@ -374,7 +372,8 @@ when not defined(CommandLine):
     proc shell(self: CommandLine, cmd: string = "") =
         let command = (if cmd != "": cmd else: input)
         record(&"\a\x03>>\a\x04{command}")
-        shell = startProcess(cmd_app, dir_feed().path, @["/c", command])
+        shell = when defined(windows): startProcess "cmd.exe", dir_feed().path, @["/c", command]
+                else: startProcess "/bin/bash", dir_feed().path, @[command, "|| exit"]
         input = ""
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
