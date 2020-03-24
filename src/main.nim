@@ -13,15 +13,17 @@ when not defined(Meta):
         repeater, clicker: Time
     method update(self: Area): Area {.discardable base.} = discard
     method render(self: Area): Area {.discardable base.} = discard
-    proc norepeat(self: Area): bool =
+    proc norepeat(self: Area): bool = 
         if (getTime() - repeater).inMilliseconds > 110: repeater = getTime(); return true
 
     # --Service procs:
-    proc abort() = raise newException(OSError, "")
-    proc control_down(): bool = KEY_Left_Control.IsKeyDown() or KEY_Right_Control.IsKeyDown()
-    proc shift_down(): bool = KEY_Left_Shift.IsKeyDown() or KEY_Right_Shift.IsKeyDown()
-    proc fit(txt: string, size: int, filler = ' '): string = txt.align(size, filler.Rune).runeSubStr 0, size
-    proc fit_left(txt: string, size: int, filler = ' '): string = txt.alignLeft(size, filler.Rune).runeSubStr 0, size
+    template abort()                = raise newException(OSError, "")
+    template control_down(): bool   = KEY_Left_Control.IsKeyDown() or KEY_Right_Control.IsKeyDown()
+    template shift_down(): bool     = KEY_Left_Shift.IsKeyDown() or KEY_Right_Shift.IsKeyDown()
+    template undot(ext: string): string                            = ext.runeSubstr((" " & ext).searchExtPos)
+    template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
+    template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0, size
+
     proc root_dir(path: string): string =
         var child = path
         while true: (if child.parentDir == "": return child else: child = child.parentDir)
@@ -35,33 +37,33 @@ when not defined(Meta):
         let
             (dir, name, ext) = path.splitFile
             mask = pattern.splitFile
-        dir / (mask.name.replace("*", name) & mask.ext.replace("*", ext.runeSubstr(ext.searchExtPos-1)))
+        dir / (mask.name.replace("*", name).addFileExt mask.ext.replace("*", ext.undot).undot)
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
-    "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.02",
-    "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
-    "===================================================================",
-    "\a\x02ESC:\a\x01    switch between dir view & console view OR deny alert choice",
-    "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
-    "\a\x02F5:\a\x01     copy selected entri(s)",
-    "\a\x02F6:\a\x01     move selected entri(s)",
-    "\a\x02F7:\a\x01     request directory creation",
-    "\a\x02F8:\a\x01     delete selected entri(s)",
-    "\a\x02Space:\a\x01  confirm alert choice",
-    "\a\x02Insert:\a\x01 (un)select hilited entry",
-    "\a\x02Home:\a\x01   request new path to browse",
-    "\a\x02Left:\a\x01   move to begin of listing",
-    "\a\x02Right:\a\x01  move to end of listing",
-    "\a\x02Up:\a\x01     move selection/view 1 line up",
-    "\a\x02Down:\a\x01   move selection/view 1 line down ",
-    "\a\x02PgUp:\a\x01   move selection/view 1 page up",
-    "\a\x02PgDown:\a\x01 move selection/view 1 page down",
-    "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
-    "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
-    "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
-    "\a\x07Numpad|\a\x02Enter:\a\x01 invert selections in current dir",
-    "==================================================================="]
+        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.03",
+        "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
+        "===================================================================",
+        "\a\x02ESC:\a\x01    switch between dir view & console view OR deny alert choice",
+        "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
+        "\a\x02F5:\a\x01     copy selected entri(s)",
+        "\a\x02F6:\a\x01     move selected entri(s)",
+        "\a\x02F7:\a\x01     request directory creation",
+        "\a\x02F8:\a\x01     delete selected entri(s)",
+        "\a\x02Space:\a\x01  confirm alert choice",
+        "\a\x02Insert:\a\x01 (un)select hilited entry",
+        "\a\x02Home:\a\x01   request new path to browse",
+        "\a\x02Left:\a\x01   move to begin of listing",
+        "\a\x02Right:\a\x01  move to end of listing",
+        "\a\x02Up:\a\x01     move selection/view 1 line up",
+        "\a\x02Down:\a\x01   move selection/view 1 line down ",
+        "\a\x02PgUp:\a\x01   move selection/view 1 page up",
+        "\a\x02PgDown:\a\x01 move selection/view 1 page down",
+        "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
+        "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
+        "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
+        "\a\x07Numpad|\a\x02Enter:\a\x01 invert selections in current dir",
+        "==================================================================="]
 # -------------------- #
 when not defined(TerminalEmu):
     type TerminalEmu = ref object
@@ -72,10 +74,10 @@ when not defined(TerminalEmu):
         margin:     int
 
     # --Properties.
-    proc hlines(self: TerminalEmu): int = GetScreenWidth() div cell.x.int
-    proc vlines(self: TerminalEmu): int = GetScreenHeight() div cell.y.int
-    proc hpos(self: TerminalEmu): int = (self.cur.x / self.cell.x).int
-    proc vpos(self: TerminalEmu): int = (self.cur.y / self.cell.y).int
+    template hlines(self: TerminalEmu): int = GetScreenWidth() div self.cell.x.int
+    template vlines(self: TerminalEmu): int = GetScreenHeight() div self.cell.y.int
+    template hpos(self: TerminalEmu): int = (self.cur.x / self.cell.x).int
+    template vpos(self: TerminalEmu): int = (self.cur.y / self.cell.y).int
 
     # --Methods goes here:
     proc loc_precise(self: TerminalEmu, x = 0, y = 0) =
@@ -116,7 +118,7 @@ when not defined(TerminalEmu):
         write "", fg_init, bg_init
         for chunk in chunks: write chunk
 
-    proc pick(self: TerminalEmu; x, y: int): auto =
+    proc pick(self: TerminalEmu, x = GetMouseX(), y = GetMouseY()): auto =
         (x div cell.x.int, y div cell.y.int)
 
     proc adjust(self: TerminalEmu) =
@@ -172,29 +174,29 @@ when not defined(DirEntry):
     const direxit = DirEntry(name: ParDir, kind: pcDir)
 
     # --Properties:
-    proc executable(self: DirEntry): bool =
-        let ext = name.splitFile.ext
-        if ext != "" and ext.runeSubstr(1) in ExeExts: return true
-    proc coloring(self: DirEntry): Color =
+    template executable(self: DirEntry): bool   = self.name.splitFile.ext.undot in ExeExts
+    template is_dir(self: DirEntry): bool       = self.kind in [pcDir, pcLinkToDir]
+
+    proc coloring(self: DirEntry): Color  =
         case kind:
             of pcDir, pcLinkToDir: WHITE
             of pcFile, pcLinkToFile:
                 if self.executable: GREEN else: BEIGE
+    proc metrics(self: DirEntry): string =
+        if self.name == ParDir:       "\xB7\x10UP--DIR\x11\xB7"
+        elif self.is_dir:             "\xB7\x10SUB-DIR\x11\xB7"
+        elif self.name == "":         ""
+        elif self.size > 99999999999: $(self.size div 1024) & "K" # Only 11 digirs could be displayed in this col.
+        else: $self.size
     proc time_stamp(self: DirEntry): string =
         if name != "": 
             mtime.format(if mtime.local.year == now().year: "dd MMM hh:mm" else: "dd MMM  yyyy")
         else: ""
 
-    # --Methods goes here:
-    template is_dir(self: DirEntry): bool = self.kind in [pcDir, pcLinkToDir]
+    # --Methods goes here:    
     proc `$`(self: DirEntry): string = (if self.is_dir: "/" elif self.executable: "*" else: " ") & name
-    template get_size(self: DirEntry): string =
-        if self.name == ParDir:       "\xB7\x10UP--DIR\x11\xB7"
-        elif self.is_dir:             "\xB7\x10SUB-DIR\x11\xB7"
-        elif self.name == "":         ""
-        elif self.size > 99999999999: $(self.size div 1024) & "K"
-        else: $self.size
-    template newDirEntry(src: tuple[kind: PathComponent, path: string]): DirEntry =
+
+    proc newDirEntry(src: tuple[kind: PathComponent, path: string]): DirEntry =
         DirEntry(name: src.path.extractFilename, kind: src.kind, size: src.path.getFileSize, 
             mtime: src.path.getLastModificationTime)
 # -------------------- #
@@ -223,9 +225,10 @@ when not defined(DirViewer):
         viewer_width    = total_width + 2
 
     # --Properties
-    proc capacity(self: DirViewer): int = host.vlines - hdr_height - foot_height - service_height
-    proc hindex(self: DirViewer): int   = hline - origin
-    proc hentry(self: DirViewer): DirEntry = list[hline]
+    template capacity(self: DirViewer): int     = host.vlines - hdr_height - foot_height - service_height
+    template hindex(self: DirViewer): int       = hline - origin
+    template hentry(self: DirViewer): DirEntry  = list[hline]
+
     proc selected_entries(self: DirViewer): seq[DirEntry] =
         for idx, entry in list: (if entry.selected: result.add entry)
         if result.len == 0: result.add self.hentry
@@ -294,14 +297,16 @@ when not defined(DirViewer):
         if not active: return self
         scroll -GetMouseWheelMove()
         let
-            (x, y) = host.pick(GetMouseX(), GetMouseY())
+            (x, y) = host.pick()
             pickline = y - hdr_height
+            pickindex = pickline + origin
         if y < hdr_height or y >= host.vlines - service_height - foot_height: discard # Not service zone.
-        elif MOUSE_Left_Button.IsMouseButtonReleased:
+        elif MOUSE_Left_Button.IsMouseButtonReleased:  # Invoke item by double left click.
             if (getTime()-clicker).inMilliseconds<=300: clicker = Time(); (if pickline == self.hindex: invoke hentry())
             else: clicker = getTime()
-        elif MOUSE_Right_Button.IsMouseButtonReleased: switch_selection pickline
-        elif MOUSE_Left_Button.IsMouseButtonDown: (if pickline != self.hindex: scroll_to pickline + origin)
+        elif MOUSE_Right_Button.IsMouseButtonReleased: (if pickindex < list.len: switch_selection pickindex) # RB=select
+        elif MOUSE_Left_Button.IsMouseButtonDown:      # HL items if left button down.
+            if pickindex != self.hline and pickindex < list.len: scroll_to pickindex
         # Kbd controls.
         if KEY_UP.IsKeyDown:         (if norepeat(): scroll -1)
         elif KEY_Down.IsKeyDown:     (if norepeat(): scroll 1)
@@ -334,7 +339,7 @@ when not defined(DirViewer):
             host.write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
             host.write @[($entry).fit_left(name_col), "\a\x01│"], text_color,
                 if active and idx == self.hindex: hl_color else: DARKBLUE # Highlight line.
-            host.write @[entry.get_size.fit(size_col), "\a\x01│"], text_color
+            host.write @[entry.metrics.fit(size_col), "\a\x01│"], text_color
             host.write entry.time_stamp.fit_left(date_col), text_color
             host.write @["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
         # Footing rendering.
@@ -360,12 +365,13 @@ when not defined(CommandLine):
         dir_feed:   proc(): DirViewer
         prompt_cb:  proc(name: string)
         input, prompt: string
-    const max_log = 99999
-    const exit_hint = " ESC to return "
+    const 
+        max_log = 99999
+        exit_hint = " ESC to return "
 
     # --Properties:
-    proc running(self: CommandLine): bool = (if not shell.isNil and shell.running: return true)
-    proc exclusive(self: CommandLine): bool = self.running or fullscreen
+    template running(self: CommandLine): bool   = not self.shell.isNil and self.shell.running
+    template exclusive(self: CommandLine): bool = self.running or self.fullscreen
 
     # --Methods goes here:
     proc scroll(self: CommandLine, shift: int) =
@@ -396,7 +402,7 @@ when not defined(CommandLine):
 
     method update(self: CommandLine): Area {.discardable.} =
         # Service controls.
-        let (x, y) = host.pick(GetMouseX(), GetMouseY())
+        let (x, y) = host.pick()
         if y == 0 and x >= host.hlines() - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
             fullscreen = false
         if KEY_Escape.IsKeyPressed: fullscreen = not fullscreen
@@ -457,14 +463,14 @@ when not defined(Alert):
         answer:  int
 
     # --Properties:
-    proc ypos(self: Alert): int = host.vlines() div 2 - 3
+    template ypos(self: Alert): int = host.vlines() div 2 - 3
 
     # --Methods goes here:
     method update(self: Alert): Area {.discardable.} =
         # Mouse controls.
         var input = if MOUSE_Left_Button.IsMouseButtonReleased:
             let h_center = host.hlines div 2
-            let (x, y) = host.pick(GetMouseX(), GetMouseY())
+            let (x, y) = host.pick()
             if   y == self.ypos + 1 and x >= h_center - 1 and x <= h_center + 1: "n"
             elif y == self.ypos + 3 and x >= h_center - 3 and x <= h_center - 1: "y"
             elif y == self.ypos + 3 and x >= h_center + 1 and x <= h_center + 3: "n"
@@ -503,10 +509,10 @@ when not defined(MultiViewer):
         current, f_key: int
 
     # --Properties:
-    proc active(self: MultiViewer): DirViewer       = viewers[current]
-    proc next_index(self: MultiViewer): int         = (current+1) %% viewers.len
-    proc next_viewer(self: MultiViewer): DirViewer  = viewers[self.next_index]
-    proc next_path(self: MultiViewer): string       = self.next_viewer.path
+    template active(self: MultiViewer): DirViewer       = self.viewers[self.current]
+    template next_index(self: MultiViewer): int         = (self.current+1) %% self.viewers.len
+    template next_viewer(self: MultiViewer): DirViewer  = self.viewers[self.next_index]
+    template next_path(self: MultiViewer): string       = self.next_viewer.path
 
     # --Methods goes here:
     proc select(self: MultiViewer, idx: int = 0) =
@@ -585,7 +591,7 @@ when not defined(MultiViewer):
             cmdline.update()
             if not cmdline.exclusive:
                 # Mouse controls.
-                let (x, y) = host.pick(GetMouseX(), GetMouseY())
+                let (x, y) = host.pick()
                 if y < host.vlines - service_height: # DirViewers picking.
                     if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown:
                         for idx, view in viewers: (if x >= view.xoffset and x <= view.xoffset+viewer_width: select idx)
