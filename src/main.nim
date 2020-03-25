@@ -38,6 +38,12 @@ when not defined(Meta):
             (dir, name, ext) = path.splitFile
             mask = pattern.splitFile
         dir / (mask.name.replace("*", name).addFileExt mask.ext.replace("*", ext.undot).undot)
+    proc check_droplist(): seq[string] =
+        if IsFileDropped():
+            var idx, list_size: int32
+            let listing = cast[array[255, ptr cstring]](GetDroppedFiles(list_size.addr))
+            result = lc[$listing[x][] | (x <- 0..<list_size), string]
+            ClearDroppedFiles()
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
@@ -532,16 +538,20 @@ when not defined(MultiViewer):
     proc navigate(self: MultiViewer, path: string) =
         discard self.active.chdir path
 
-    template transfer(self: MultiViewer; dir_proc, file_proc: untyped; destructive = false; ren_pattern = "") =
+    proc transfer(self: MultiViewer; src, dest: string; dir_proc, file_proc: proc(src, dest: string)): bool =
+        if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
+            warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
+            if src.dirExists: src.dir_proc(dest) else: src.file_proc(dest)
+            return true
+
+    template sel_transfer(self: MultiViewer; dir_proc, file_proc: untyped; destructive = false; ren_pattern = "") =
         var 
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
         for entry in self.active.selected_entries:
             let src = self.active.path / entry.name
             let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
-            if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
-                warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
-                    if entry.is_dir: src.dir_proc(dest) else: src.file_proc(dest)
+            if transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
                     self.next_viewer.dirty = true
                     if destructive: self.active.dirty = true
                     last_transferred = dest.extractFilename
@@ -553,11 +563,11 @@ when not defined(MultiViewer):
             select self.next_index
 
     proc copy(self: MultiViewer) =
-        transfer(self, copyDir, copyFile)
+        sel_transfer(self, copyDir, copyFile)
 
     proc move(self: MultiViewer, ren_pattern = "") =
         let src_viewer = self.active
-        transfer(self, moveDir, moveFile, true, ren_pattern)
+        sel_transfer(self, moveDir, moveFile, true, ren_pattern)
         src_viewer.refresh()
 
     proc new_dir(self: MultiViewer, name: string) =
@@ -573,10 +583,21 @@ when not defined(MultiViewer):
         self.active.refresh()
         sync(self.active)
 
+    proc receive(self: MultiViewer, list: seq[string]) =
+        var last_transferred: string
+        for src in list:
+            if transfer(src, self.active.path / src.extractFilename, copyDir, copyFile): 
+                last_transferred = src.extractFilename
+                self.active.dirty = true
+                echo last_transferred
+        if self.active.dirty:
+            self.active.refresh().scroll_to_name(last_transferred)
+            sync self.active
+
     proc request_navigation(self: MultiViewer) =
         cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) => self.navigate path
 
-    proc request_transfer(self: MultiViewer) =
+    proc request_moving(self: MultiViewer) =
         cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
 
     proc request_new_dir(self: MultiViewer) =
@@ -585,28 +606,40 @@ when not defined(MultiViewer):
     proc request_deletion(self: MultiViewer) =
         if warn(&"Are you sure want to delete {self.active.selected_entries.len} entris") >= 1: delete()
 
+    proc pick_viewer(self: MultiViewer, x = GetMouseX(), y = GetMouseY()): int =
+        if y < host.vlines - service_height:
+            for idx, view in viewers: 
+                if x >= view.xoffset and x <= view.xoffset+viewer_width: return idx
+        return -1
+
     method update(self: MultiViewer): Area {.discardable.} =
         f_key = 0 # F-key emulator.
         try:
             cmdline.update()
             if not cmdline.exclusive:
                 # Mouse controls.
-                let (x, y) = host.pick()
-                if y < host.vlines - service_height: # DirViewers picking.
-                    if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown:
-                        for idx, view in viewers: (if x >= view.xoffset and x <= view.xoffset+viewer_width: select idx)
+                let
+                    (x, y) = host.pick()
+                    picked_view_idx = pick_viewer(x, y)
+                if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown: # DirViewers picking.
+                    if picked_view_idx >= 0: select picked_view_idx
                 elif y == host.vlines-1 and MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking.
                     let index = (x-1) / 11 + 1
                     if index-index.int.float < 0.7: f_key = index.int # If click in button bounds - activating.
+                # Drag/drop handling.
+                let droplist = check_droplist()                
+                if picked_view_idx >= 0 and droplist.len > 0:
+                    select picked_view_idx
+                    receive droplist
                 # Keyboard controls.
                 if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help: cmdline.record(hint))
                 elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
-                elif f_key==6 or KEY_F6.IsKeyPressed:   request_transfer()
+                elif f_key==6 or KEY_F6.IsKeyPressed:   request_moving()
                 elif f_key==7 or KEY_F7.IsKeyPressed:   request_new_dir()
                 elif f_key==8 or KEY_F8.IsKeyPressed:   request_deletion()
                 elif f_key==10 or KEY_F10.IsKeyPressed: quit()
-                elif KEY_Home.IsKeyPressed: request_navigation()
-                elif KEY_Tab.IsKeyPressed:  select(self.next_index)
+                elif KEY_Home.IsKeyPressed:             request_navigation()
+                elif KEY_Tab.IsKeyPressed:              select(self.next_index)
                 # Viewer update.
                 self.active.update()
                 if dirty:
