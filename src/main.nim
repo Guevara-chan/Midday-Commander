@@ -51,6 +51,9 @@ when not defined(Meta):
     proc wildcard_match(path: string, pattern = "*.*"): bool =
         proc match_part(part, pattern: string): bool =
             var idx: int
+            if pattern.runeLen > part.runeLen: # Special cases.
+                if part == "" and pattern == "*": return true
+                return false
             for chr in pattern.runes:
                 case chr:
                     of '?'.Rune: discard
@@ -61,19 +64,20 @@ when not defined(Meta):
         let 
             (dir, name, ext) = path.splitFile
             mask = pattern.splitFile
-        return name.match_part(mask.name) and ext.match_part(mask.ext)
+        return name.match_part(mask.name) and ext.undot.match_part(mask.ext.undot)
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
-        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.03",
+        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.04",
         "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
         "===================================================================",
         "\a\x02ESC:\a\x01    switch between dir view & console view OR deny alert choice",
         "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
         "\a\x02F5:\a\x01     copy selected entri(s)",
-        "\a\x02F6:\a\x01     move selected entri(s)",
+        "\a\x02F6:\a\x01     request moving selected entri(s) with optional renaming",
         "\a\x02F7:\a\x01     request directory creation",
         "\a\x02F8:\a\x01     delete selected entri(s)",
+        "\a\x02F10:\a\x01    quit program",
         "\a\x02Space:\a\x01  confirm alert choice",
         "\a\x02Insert:\a\x01 (un)select hilited entry",
         "\a\x02Home:\a\x01   request new path to browse",
@@ -87,7 +91,9 @@ when not defined(Meta):
         "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
-        "\a\x07Numpad|\a\x02Enter:\a\x01 invert selections in current dir",
+        "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
+        "\a\x07Numpad|\a\x02+:\a\x01     reqest pattern for mass selection in current dir",
+        "\a\x07Numpad|\a\x02-:\a\x01     reqest pattern for mass deselection in current dir",
         "==================================================================="]
 # -------------------- #
 when not defined(TerminalEmu):
@@ -318,9 +324,10 @@ when not defined(DirViewer):
     proc switch_selection(self: DirViewer, idx: int, state = -1) =
         var entry = list[idx]
         entry.selected = if state < 0: not entry.selected else: state.bool
-        let factor = if entry.selected: 1 else: -1 # Updating stat.
-        if not entry.is_dir: sel_stat.bytes += entry.size * factor; sel_stat.files += factor
-        else: sel_stat.dirs += factor
+        if entry.selected != list[idx].selected: # If any real changes ocurred
+            let factor = if entry.selected: 1 else: -1 # Updating stat.
+            if not entry.is_dir: sel_stat.bytes += entry.size * factor; sel_stat.files += factor
+            else: sel_stat.dirs += factor
         list[idx] = entry
 
     proc select_inverted(self: DirViewer) =
@@ -379,7 +386,8 @@ when not defined(DirViewer):
         # Footing rendering.
         host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
-        host.write @[($hentry()).fit_left(total_width), "\a\x01║\n"], hentry().coloring
+        host.write @[($hentry()).fit_left(total_width), "\a\x01", if ($hentry()).len>total_width: "…" else: "║", "\n"],
+            hentry().coloring
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
         let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
         host.write ["╚", total_size.center(total_width+4, '-').replace("-", "═"), "╝"]
@@ -621,6 +629,11 @@ when not defined(MultiViewer):
             self.active.refresh().scroll_to_name(last_transferred)
             sync self.active
 
+    proc manage_selection(self: MultiViewer, pattern = "", new_state = true) =
+        let mask = if pattern != "": pattern else: "*.*"
+        for idx, entry in self.active.list:
+            if entry.name.wildcard_match(mask): self.active.switch_selection(idx, new_state.int)
+
     proc request_navigation(self: MultiViewer) =
         cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) => self.navigate path
 
@@ -632,6 +645,10 @@ when not defined(MultiViewer):
 
     proc request_deletion(self: MultiViewer) =
         if warn(&"Are you sure want to delete {self.active.selected_entries.len} entris") >= 1: delete()
+
+    proc request_sel_management(self: MultiViewer, new_state = true) =
+        cmdline.request "Input " & (if new_state: "" else: "un") & "selection pattern \a\x03<*.*>", (pattern: string) =>
+            self.manage_selection(pattern, new_state)
 
     proc pick_viewer(self: MultiViewer, x = GetMouseX(), y = GetMouseY()): int =
         if y < host.vlines - service_height:
@@ -670,6 +687,8 @@ when not defined(MultiViewer):
                 elif KEY_Home.IsKeyPressed:             request_navigation()
                 elif KEY_Tab.IsKeyPressed:              select(self.next_index)
                 elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
+                elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
+                elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
                 # Viewer update.
                 self.active.update()
                 if dirty:
