@@ -66,6 +66,7 @@ when not defined(Meta):
         "\a\x02PgUp:\a\x01   move selection/view 1 page up",
         "\a\x02PgDown:\a\x01 move selection/view 1 page down",
         "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
+        "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
         "\a\x07Numpad|\a\x02Enter:\a\x01 invert selections in current dir",
@@ -233,7 +234,8 @@ when not defined(DirViewer):
     # --Properties
     template capacity(self: DirViewer): int     = host.vlines - hdr_height - foot_height - service_height
     template hindex(self: DirViewer): int       = hline - origin
-    template hentry(self: DirViewer): DirEntry  = list[hline]
+    template hentry(self: DirViewer): DirEntry  = self.list[self.hline]
+    template hpath(self: DirViewer): string     = self.path / self.hentry.name
 
     proc selected_entries(self: DirViewer): seq[DirEntry] =
         for idx, entry in list: (if entry.selected: result.add entry)
@@ -641,6 +643,7 @@ when not defined(MultiViewer):
                 elif f_key==10 or KEY_F10.IsKeyPressed: quit()
                 elif KEY_Home.IsKeyPressed:             request_navigation()
                 elif KEY_Tab.IsKeyPressed:              select(self.next_index)
+                elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
                 # Viewer update.
                 self.active.update()
                 if dirty:
