@@ -589,7 +589,6 @@ when not defined(MultiViewer):
             if transfer(src, self.active.path / src.extractFilename, copyDir, copyFile): 
                 last_transferred = src.extractFilename
                 self.active.dirty = true
-                echo last_transferred
         if self.active.dirty:
             self.active.refresh().scroll_to_name(last_transferred)
             sync self.active
@@ -628,9 +627,11 @@ when not defined(MultiViewer):
                     if index-index.int.float < 0.7: f_key = index.int # If click in button bounds - activating.
                 # Drag/drop handling.
                 let droplist = check_droplist()                
-                if picked_view_idx >= 0 and droplist.len > 0:
-                    select picked_view_idx
-                    receive droplist
+                if droplist.len > 0:
+                    if picked_view_idx >= 0:
+                        select picked_view_idx
+                        receive droplist
+                    elif y == host.vlines - service_height: cmdline.paste(droplist[0])
                 # Keyboard controls.
                 if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help: cmdline.record(hint))
                 elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
