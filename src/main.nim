@@ -1,5 +1,5 @@
 import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings, raylib
-from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, `==`, `$`
+from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, `==`, `$`
 {.this: self.}
 
 #.{ [Classes]
@@ -295,9 +295,16 @@ when not defined(DirViewer):
         return organize().scroll_to(last_hl)
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
+        # Init setup.
         let prev_dir = path.extractFilename
         ((if newdir.isAbsolute: newdir else: path / newdir).normalizedPath & DirSep).setCurrentDir
-        path = getCurrentDir().normalizedPath
+        # Case correction.
+        var corrector: string = getCurrentDir().root_dir.capitalize
+        for parent in toSeq(getCurrentDir().parentDirs).reversed: # Case correction.
+            for real_name in walkPattern(parent/../parent.extractFilename): 
+                corrector = corrector / (real_name.extractFilename)
+        path = corrector
+        # Finalization.
         scroll_to(0).refresh()
         if newdir == ParDir: scroll_to_name(prev_dir) # Backtrace.
         return self
