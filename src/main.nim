@@ -1,5 +1,5 @@
 import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings, raylib
-from unicode import Rune, runes, align, alignLeft, runeSubStr, `==`, `$`, runeLen
+from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, `==`, `$`
 {.this: self.}
 
 #.{ [Classes]
@@ -27,23 +27,41 @@ when not defined(Meta):
     proc root_dir(path: string): string =
         var child = path
         while true: (if child.parentDir == "": return child else: child = child.parentDir)
+
     proc drive_list(): seq[string] =
         when defined(windows):
             for drive in execCmdEx("wmic logicaldisk get caption,Access", {poDaemon}).output.splitLines[1..^1]
                 .filterIt(it!=""):
                     if drive[0] != ' ': result.add drive.subStr(4).strip()
         else: @[]
-    proc wildcard_replace(path: string, pattern = "*.*"): string =
-        let
-            (dir, name, ext) = path.splitFile
-            mask = pattern.splitFile
-        dir / (mask.name.replace("*", name).addFileExt mask.ext.replace("*", ext.undot).undot)
+
     proc check_droplist(): seq[string] =
         if IsFileDropped():
             var idx, list_size: int32
             let listing = cast[array[255, ptr cstring]](GetDroppedFiles(list_size.addr))
             result = lc[$listing[x][] | (x <- 0..<list_size), string]
             ClearDroppedFiles()
+
+    proc wildcard_replace(path: string, pattern = "*.*"): string =
+        let
+            (dir, name, ext) = path.splitFile
+            mask = pattern.splitFile
+        dir / (mask.name.replace("*", name).addFileExt mask.ext.replace("*", ext.undot).undot)
+
+    proc wildcard_match(path: string, pattern = "*.*"): bool =
+        proc match_part(part, pattern: string): bool =
+            var idx: int
+            for chr in pattern.runes:
+                case chr:
+                    of '?'.Rune: discard
+                    of '*'.Rune: return part.endsWith(pattern.runeSubstr(idx+1))
+                    elif chr != part.runeAt(idx): return false 
+                idx.inc
+            return true
+        let 
+            (dir, name, ext) = path.splitFile
+            mask = pattern.splitFile
+        return name.match_part(mask.name) and ext.match_part(mask.ext)
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
@@ -177,7 +195,7 @@ when not defined(DirEntry):
         kind: PathComponent
         size: BiggestInt
         mtime: Time
-        selected: bool
+        selected, hidden: bool
     const direxit = DirEntry(name: ParDir, kind: pcDir)
 
     # --Properties:
@@ -185,10 +203,11 @@ when not defined(DirEntry):
     template is_dir(self: DirEntry): bool       = self.kind in [pcDir, pcLinkToDir]
 
     proc coloring(self: DirEntry): Color  =
-        case kind:
+        result = case kind:
             of pcDir, pcLinkToDir: WHITE
             of pcFile, pcLinkToFile:
                 if self.executable: GREEN else: BEIGE
+        if hidden: result = result.Fade(0.7)
     proc metrics(self: DirEntry): string =
         if self.name == ParDir:       "\xB7\x10UP--DIR\x11\xB7"
         elif self.is_dir:             "\xB7\x10SUB-DIR\x11\xB7"
@@ -204,7 +223,7 @@ when not defined(DirEntry):
     proc `$`(self: DirEntry): string = (if self.is_dir: "/" elif self.executable: "*" else: " ") & name
 
     proc newDirEntry(src: tuple[kind: PathComponent, path: string]): DirEntry =
-        DirEntry(name: src.path.extractFilename, kind: src.kind, size: src.path.getFileSize, 
+        DirEntry(name: src.path.extractFilename, kind: src.kind, size: src.path.getFileSize, hidden: src.path.isHidden,
             mtime: src.path.getLastModificationTime)
 # -------------------- #
 when not defined(DirViewer):
@@ -267,11 +286,11 @@ when not defined(DirViewer):
     proc refresh(self: DirViewer): auto {.discardable.} =
         let last_hl = hline # To return for hl position later.
         dir_stat = Breakdown(); sel_stat = BreakDown(); list.setLen(0)
+        if not path.isRootDir: list.add(direxit); list[0].mtime = path.getLastModificationTime # .. entry.
         for record in walkDir(path): 
             let entry = newDirEntry record
             if not entry.is_dir: dir_stat.bytes += entry.size; dir_stat.files.inc else: dir_stat.dirs.inc
             list.add entry
-        if not path.isRootDir: list.insert(direxit, 0) # .. entry.
         dirty = false
         return organize().scroll_to(last_hl)
 
@@ -345,7 +364,7 @@ when not defined(DirViewer):
         for idx, entry in render_list:
             let text_color = if entry.selected: selected_color else: entry.coloring
             host.write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
-            host.write @[($entry).fit_left(name_col), "\a\x01│"], text_color,
+            host.write @[($entry).fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
                 if active and idx == self.hindex: hl_color else: DARKBLUE # Highlight line.
             host.write @[entry.metrics.fit(size_col), "\a\x01│"], text_color
             host.write entry.time_stamp.fit_left(date_col), text_color
