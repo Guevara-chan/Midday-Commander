@@ -402,9 +402,6 @@ when not defined(DirViewer):
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
         let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
         host.write ["╚", total_size.center(total_width+4, '-').replace("-", "═"), "╝"]
-        # if ext != "":
-        #     host.loc(host.hpos-ext.runeLen-2, host.vpos)
-        #     host.write "╧", border_color
         # Finalization.
         return self
 
