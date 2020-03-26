@@ -388,12 +388,13 @@ when not defined(DirViewer):
         host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
         # Entry fullname row rendering.
-        var entry_id = $hentry()
-        let ext = entry_id.splitFile.ext.undot
-        if ext != "": # Adding separate extension cell.
+        var 
+            entry_id = $hentry()
+            ext = entry_id.splitFile.ext.undot
+        if ext != "" and not hentry().is_dir and ext.runeLen <= total_width: # Adding separate extension cell.
             entry_id = entry_id.changeFileExt ""
             let left_col = total_width - ext.runeLen - 1
-            host.write @[entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col:"…" else:"\u2192"],
+            host.write @[entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col: "…" else: "\u2192"],
                 hentry().coloring
             host.write @[ext, "\a\x01║\n"], hentry().coloring
         else: host.write @[entry_id.fit_left(total_width), "\a\x01", if entry_id.runeLen>total_width:"…" else:"║","\n"],
