@@ -765,11 +765,11 @@ proc GetFileNameWithoutExt*(filePath: cstring): cstring {.RLAPI, importc: "GetFi
 proc GetDirectoryPath*(filePath: cstring): cstring {.RLAPI, importc: "GetDirectoryPath".} # Get full path for a given fileName with path (uses static string)
 proc GetPrevDirectoryPath*(dirPath: cstring): cstring {.RLAPI, importc: "GetPrevDirectoryPath".} # Get previous directory path for a given path (uses static string)
 proc GetWorkingDirectory*(): cstring {.RLAPI, importc: "GetWorkingDirectory".} # Get current working directory (uses static string)
-proc GetDirectoryFiles*(dirPath: cstring; count: pointer): ptr char {.RLAPI, importc: "GetDirectoryFiles".} # Get filenames in a directory path (memory should be freed)
+proc GetDirectoryFiles*(dirPath: cstring; count: pointer): cstringArray {.RLAPI, importc: "GetDirectoryFiles".} # Get filenames in a directory path (memory should be freed)
 proc ClearDirectoryFiles*() {.RLAPI, importc: "ClearDirectoryFiles".} # Clear directory files paths buffers (free memory)
 proc ChangeDirectory*(dir: cstring): bool {.RLAPI, importc: "ChangeDirectory".} # Change working directory, returns true if success
 proc IsFileDropped*(): bool {.RLAPI, importc: "IsFileDropped".} # Check if a file has been dropped into window
-proc GetDroppedFiles*(count: pointer): ptr char {.RLAPI, importc: "GetDroppedFiles".} # Get dropped files names (memory should be freed)
+proc GetDroppedFiles*(count: pointer): cstringArray {.RLAPI, importc: "GetDroppedFiles".} # Get dropped files names (memory should be freed)
 proc ClearDroppedFiles*() {.RLAPI, importc: "ClearDroppedFiles".} # Clear dropped files paths buffer (free memory)
 proc GetFileModTime*(fileName: cstring): int32 {.RLAPI, importc: "GetFileModTime".} # Get file modification time (last write time)
 proc CompressData*(data: uint8; dataLength: int32; compDataLength: pointer): uint8 {.RLAPI, importc: "CompressData".} # Compress data (DEFLATE algorythm)

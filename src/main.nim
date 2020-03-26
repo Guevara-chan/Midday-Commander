@@ -18,8 +18,8 @@ when not defined(Meta):
 
     # --Service procs:
     template abort()                = raise newException(OSError, "")
-    template control_down(): bool   = KEY_Left_Control.IsKeyDown() or KEY_Right_Control.IsKeyDown()
-    template shift_down(): bool     = KEY_Left_Shift.IsKeyDown() or KEY_Right_Shift.IsKeyDown()
+    template control_down(): bool   = KEY_Left_Control.IsKeyDown()  or KEY_Right_Control.IsKeyDown()
+    template shift_down(): bool     = KEY_Left_Shift.IsKeyDown()    or KEY_Right_Shift.IsKeyDown()
     template undot(ext: string): string                            = ext.runeSubstr((" " & ext).searchExtPos)
     template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
     template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0, size
@@ -38,8 +38,8 @@ when not defined(Meta):
     proc check_droplist(): seq[string] =
         if IsFileDropped():
             var idx, list_size: int32
-            let listing = cast[array[255, ptr cstring]](GetDroppedFiles(list_size.addr))
-            result = lc[$listing[x][] | (x <- 0..<list_size), string]
+            let listing = GetDroppedFiles(list_size.addr)
+            result = lc[$listing[x] | (x <- 0..<list_size), string]
             ClearDroppedFiles()
 
     proc wildcard_replace(path: string, pattern = "*.*"): string =
@@ -383,11 +383,14 @@ when not defined(DirViewer):
             host.write @[entry.metrics.fit(size_col), "\a\x01│"], text_color
             host.write entry.time_stamp.fit_left(date_col), text_color
             host.write @["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
-        # Footing rendering.
+        # 1st footline rendering.
         host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
+        # Entry fullname row rendering.
+
         host.write @[($hentry()).fit_left(total_width), "\a\x01", if ($hentry()).len>total_width: "…" else: "║", "\n"],
             hentry().coloring
+        # 2nd footline rendering.
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
         let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
         host.write ["╚", total_size.center(total_width+4, '-').replace("-", "═"), "╝"]
