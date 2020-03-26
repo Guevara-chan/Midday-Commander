@@ -391,7 +391,7 @@ when not defined(DirViewer):
         var 
             entry_id = $hentry()
             ext = entry_id.splitFile.ext.undot
-        if ext != "" and not hentry().is_dir and ext.runeLen <= total_width: # Adding separate extension cell.
+        if ext != "" and ext.runeLen < total_width and not hentry().is_dir: # Adding separate extension cell.
             entry_id = entry_id.changeFileExt ""
             let left_col = total_width - ext.runeLen - 1
             host.write @[entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col: "…" else: "\u2192"],
