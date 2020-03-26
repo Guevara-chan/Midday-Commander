@@ -186,8 +186,9 @@ when not defined(TerminalEmu):
         var glyphs: array[486, int]
         for i in 0..glyphs.high: glyphs[i] = i
         let extra_chars = @[
-            0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0xB7,0xB0,0xA0
-                ] & lc[x | (x <- 0x410..0x451), int]
+            0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0x2192,
+                0xB7,0xB0,0xA0
+            ] & lc[x | (x <- 0x410..0x451), int]
         glyphs[0x80..0x80+extra_chars.len-1] = extra_chars
         # Terminal object.
         result = TerminalEmu(font:"res/TerminalVector.ttf".LoadFontEx(12,glyphs.addr,glyphs.len), palette:colors.toSeq)
@@ -387,13 +388,23 @@ when not defined(DirViewer):
         host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
         # Entry fullname row rendering.
-
-        host.write @[($hentry()).fit_left(total_width), "\a\x01", if ($hentry()).len>total_width: "…" else: "║", "\n"],
+        var entry_id = $hentry()
+        let ext = entry_id.splitFile.ext.undot
+        if ext != "": # Adding separate extension cell.
+            entry_id = entry_id.changeFileExt ""
+            let left_col = total_width - ext.runeLen - 1
+            host.write @[entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col:"…" else:"\u2192"],
+                hentry().coloring
+            host.write @[ext, "\a\x01║\n"], hentry().coloring
+        else: host.write @[entry_id.fit_left(total_width), "\a\x01", if entry_id.runeLen>total_width:"…" else:"║","\n"],
             hentry().coloring
         # 2nd footline rendering.
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
         let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
         host.write ["╚", total_size.center(total_width+4, '-').replace("-", "═"), "╝"]
+        # if ext != "":
+        #     host.loc(host.hpos-ext.runeLen-2, host.vpos)
+        #     host.write "╧", border_color
         # Finalization.
         return self
 
