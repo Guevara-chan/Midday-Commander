@@ -19,7 +19,7 @@ when not defined(Meta):
         if (getTime() - repeater).inMilliseconds > 110: repeater = getTime(); return true
 
     # --Service procs:
-    template abort()                = raise newException(OSError, "")
+    template abort(reason = "")     = raise newException(OSError, reason)
     template control_down(): bool   = KEY_Left_Control.IsKeyDown()  or KEY_Right_Control.IsKeyDown()
     template shift_down(): bool     = KEY_Left_Shift.IsKeyDown()    or KEY_Right_Shift.IsKeyDown()
     template undot(ext: string): string                            = ext.runeSubstr((" " & ext).searchExtPos)
@@ -579,6 +579,18 @@ when not defined(ProgressWatch):
 
     method render(self: ProgressWatch): Area {.discardable.} =
         parent.render()
+        let 
+            elapsed = getTime() - start
+            midline = host.vlines() div 2
+        host.margin = host.hlines() div 2 - 5
+        host.loc(host.margin, 0)
+        for y in 0..host.vlines(): 
+            let 
+                border = if y == midline: "\a\x04█" else: "│"
+                shift  = elapsed.seconds + 1 * (y - midline)
+                time   = initDuration(seconds = if shift < 0: 0.int64 else: elapsed.seconds + 1 * (y - midline))
+            host.write @[border, if y == midline: "\a\x04" else: "",
+                &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}\a\x03", border, "\n"], DarkGRAY, Black
         return self
 
     proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
