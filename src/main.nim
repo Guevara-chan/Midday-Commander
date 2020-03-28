@@ -1,4 +1,4 @@
-import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings#, threadpool
+import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings, threadpool
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, `==`, `$`
 import raylib
 {.this: self.}
@@ -163,7 +163,7 @@ when not defined(TerminalEmu):
         BeginDrawing()
         ClearBackground BLACK
         for area in areas: area.update().render()
-        DrawFPS(0,0)
+        #DrawFPS(0,0)
         EndDrawing()
 
     proc loop_with(self: TerminalEmu, areas: varargs[Area]) = 
@@ -568,7 +568,6 @@ when not defined(Alert):
         try: result.host.loop_with result except: discard
 # -------------------- #
 when not defined(ProgressWatch):
-    type FlowVarBase = object
     type ProgressWatch = ref object of Area
         host:  TerminalEmu
         start: Time
