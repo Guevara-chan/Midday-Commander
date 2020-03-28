@@ -661,12 +661,12 @@ when not defined(MultiViewer):
         for entry in self.active.selected_entries:
             let src = self.active.path / entry.name
             let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
-            if transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
-                    self.next_viewer.dirty = true
-                    if destructive: self.active.dirty = true
-                    last_transferred = dest.extractFilename
-            if sel_indexes.len > 0 and not destructive: # Selection removal.
-                self.active.switch_selection sel_indexes[0]
+            if entry.name != direxit.name or transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
+                self.next_viewer.dirty = true
+                if destructive: self.active.dirty = true
+                last_transferred = dest.extractFilename
+            if sel_indexes.len > 0 and entry.name == direxit.name or not destructive: # Selection removal.
+                self.active.switch_selection sel_indexes[0], 0
                 sel_indexes.delete 0
         # Finalization.
         if self.next_viewer.dirty: # Only if any changes happened.
@@ -695,8 +695,10 @@ when not defined(MultiViewer):
         reset_watcher()
         # Actual deletion.
         for idx, entry in self.active.selected_entries:
-            let victim = self.active.path / entry.name
-            wait_task spawn victim.deleter(entry.is_dir)
+            if entry.name != direxit.name: # No deletion for ..
+                let victim = self.active.path / entry.name
+                wait_task spawn victim.deleter(entry.is_dir)
+            else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
         # Finalization.
         self.active.refresh()
