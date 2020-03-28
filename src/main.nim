@@ -1,5 +1,6 @@
-import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings, raylib
+import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings#, threadpool
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, `==`, `$`
+import raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -11,6 +12,7 @@ when not defined(Meta):
     # --Service classes:
     type Area {.inheritable.} = ref object
         repeater, clicker: Time
+        parent: Area
     method update(self: Area): Area {.discardable base.} = discard
     method render(self: Area): Area {.discardable base.} = discard
     proc norepeat(self: Area): bool = 
@@ -161,7 +163,7 @@ when not defined(TerminalEmu):
         BeginDrawing()
         ClearBackground BLACK
         for area in areas: area.update().render()
-        #DrawFPS(0,0)
+        DrawFPS(0,0)
         EndDrawing()
 
     proc loop_with(self: TerminalEmu, areas: varargs[Area]) = 
@@ -197,11 +199,13 @@ when not defined(TerminalEmu):
         result.adjust()
 # -------------------- #
 when not defined(DirEntry):
+    type DirEntryDesc = tuple[id: string, metrics: string, time_stamp: string, coloring: Color]
     type DirEntry = object
         name: string
         kind: PathComponent
         size: BiggestInt
         mtime: Time
+        memo: DirEntryDesc
         selected, hidden: bool
     const direxit = DirEntry(name: ParDir, kind: pcDir)
 
@@ -209,7 +213,7 @@ when not defined(DirEntry):
     template executable(self: DirEntry): bool   = self.name.splitFile.ext.undot in ExeExts
     template is_dir(self: DirEntry): bool       = self.kind in [pcDir, pcLinkToDir]
 
-    proc coloring(self: DirEntry): Color  =
+    proc coloring(self: DirEntry): Color =
         result = case kind:
             of pcDir, pcLinkToDir: WHITE
             of pcFile, pcLinkToFile:
@@ -228,6 +232,9 @@ when not defined(DirEntry):
 
     # --Methods goes here:    
     proc `$`(self: DirEntry): string = (if self.is_dir: "/" elif self.executable: "*" else: " ") & name
+
+    proc get_desc(self: DirEntry): DirEntryDesc =
+        if memo.id == "": ($self, self.metrics, self.time_stamp, self.coloring) else: memo
 
     proc newDirEntry(src: tuple[kind: PathComponent, path: string]): DirEntry =
         DirEntry(name: src.path.extractFilename, kind: src.kind, size: src.path.getFileSize, hidden: src.path.isHidden,
@@ -334,6 +341,14 @@ when not defined(DirViewer):
     proc select_inverted(self: DirViewer) =
         for idx, entry in list: switch_selection(idx)
 
+    proc cache_desc(self: DirViewer, idx: int): DirEntryDesc =
+        if idx < list.len:
+            var entry = list[idx]
+            result = entry.get_desc()
+            if entry.memo.id == "":
+                entry.memo = result
+                list[idx] = entry
+
     method update(self: DirViewer): Area {.discardable.} =
         # Mouse controls.
         if not active: return self
@@ -377,12 +392,13 @@ when not defined(DirViewer):
             "Modify time".center(date_col), "\a\x01║\n"], border_color, DARKBLUE
         # List rendering.
         for idx, entry in render_list:
-            let text_color = if entry.selected: selected_color else: entry.coloring
+            let desc = cache_desc(idx)
+            let text_color = if entry.selected: selected_color else: desc.coloring
             host.write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
-            host.write @[($entry).fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
+            host.write @[desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
                 if active and idx == self.hindex: hl_color else: DARKBLUE # Highlight line.
-            host.write @[entry.metrics.fit(size_col), "\a\x01│"], text_color
-            host.write entry.time_stamp.fit_left(date_col), text_color
+            host.write @[desc.metrics.fit(size_col), "\a\x01│"], text_color
+            host.write desc.time_stamp.fit_left(date_col), text_color
             host.write @["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
         # 1st footline rendering.
         host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
@@ -512,7 +528,6 @@ when not defined(CommandLine):
 when not defined(Alert):
     type Alert = ref object of Area
         host:    TerminalEmu
-        parent:  Area
         message: string
         answer:  int
 
@@ -550,8 +565,25 @@ when not defined(Alert):
 
     proc newAlert(term: TerminalEmu, creator: Area, msg: string): Alert =
         result = Alert(host: term, parent: creator, message: &"{msg} ?")
-        try: result.host.loop_with result
-        except: discard
+        try: result.host.loop_with result except: discard
+# -------------------- #
+when not defined(ProgressWatch):
+    type FlowVarBase = object
+    type ProgressWatch = ref object of Area
+        host:  TerminalEmu
+        start: Time
+        task:  FlowVarBase
+
+    # --Methods goes here:
+    method update(self: ProgressWatch): Area {.discardable.} =
+        discard
+
+    method render(self: ProgressWatch): Area {.discardable.} =
+        discard
+
+    proc newProgressWatch(term: TerminalEmu, creator: Area, task: FlowVarBase): ProgressWatch =
+        result = ProgressWatch(host: term, parent: creator, start: getTime(), task: task)
+        try: result.host.loop_with result except: discard
 # -------------------- #
 when not defined(MultiViewer):
     type MultiViewer = ref object of Area
