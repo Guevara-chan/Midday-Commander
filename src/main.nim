@@ -572,18 +572,17 @@ when not defined(ProgressWatch):
     type ProgressWatch = ref object of Area
         host:  TerminalEmu
         start: Time
-        task:  FlowVarBase
 
     # --Methods goes here:
     method update(self: ProgressWatch): Area {.discardable.} =
-        if task.isReady: abort()
+        return self
 
     method render(self: ProgressWatch): Area {.discardable.} =
-        discard
+        parent.render()
+        return self
 
-    proc newProgressWatch(term: TerminalEmu, creator: Area, task: FlowVarBase): ProgressWatch =
-        result = ProgressWatch(host: term, parent: creator, start: getTime(), task: task)
-        try: result.host.loop_with result except: discard
+    proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
+        ProgressWatch(host: term, parent: creator, start: getTime())
 # -------------------- #
 when not defined(MultiViewer):
     type MultiViewer = ref object of Area
@@ -592,6 +591,7 @@ when not defined(MultiViewer):
         cmdline: CommandLine
         error:   tuple[msg: string, time: Time]
         dirty:   bool
+        watcher: ProgressWatch
         current, f_key: int
 
     # --Properties:
@@ -612,6 +612,14 @@ when not defined(MultiViewer):
                 let prev_hl = view.hline
                 view.refresh().scroll_to prev_hl
 
+    proc reset_watcher(self: MultiViewer) =
+        watcher = newProgressWatch(host, self)
+
+    proc wait_task(self: MultiViewer, task: FlowVar[ref Exception]) =
+        while not task.isReady: host.update watcher
+        let error = ^task
+        if not error.isNil: raise error
+
     proc warn(self: MultiViewer, message: string): int =
         return newAlert(host, self, message).answer
 
@@ -619,15 +627,25 @@ when not defined(MultiViewer):
         discard self.active.chdir path
 
     proc transfer(self: MultiViewer; src, dest: string; dir_proc, file_proc: proc(src, dest: string)): bool =
+        # Service proc.
+        proc transferrer(src, dest: string, dir_proc, file_proc: proc(src, dest: string)): ref Exception =
+            try: 
+                if src.dirExists: src.dir_proc(dest) else: src.file_proc(dest)
+            except: return getCurrentException()
+        # Actual transfer.
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
-            if src.dirExists: src.dir_proc(dest) else: src.file_proc(dest)
+            let is_dir = src.dirExists
+            wait_task spawn src.transferrer(dest, dir_proc, file_proc)
             return true
 
     template sel_transfer(self: MultiViewer; dir_proc, file_proc: untyped; destructive = false; ren_pattern = "") =
+        # Init setup.
         var 
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
+        reset_watcher()
+        # Transfer loop.
         for entry in self.active.selected_entries:
             let src = self.active.path / entry.name
             let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
@@ -638,11 +656,12 @@ when not defined(MultiViewer):
             if sel_indexes.len > 0 and not destructive: # Selection removal.
                 self.active.switch_selection sel_indexes[0]
                 sel_indexes.delete 0
+        # Finalization.
         if self.next_viewer.dirty: # Only if any changes happened.
             self.next_viewer.refresh().scroll_to_name(last_transferred)
             select self.next_index
 
-    proc copy(self: MultiViewer) =
+    proc copy(self: MultiViewer): int {.discardable.} =
         sel_transfer(self, copyDir, copyFile)
 
     proc move(self: MultiViewer, ren_pattern = "") =
@@ -655,21 +674,32 @@ when not defined(MultiViewer):
         self.active.refresh.scroll_to_name name
         sync self.active
 
-    proc delete(self: MultiViewer): int {.discardable.} =
+    proc delete(self: MultiViewer) =
+        # Service proc.
+        proc deleter(victim: string, is_dir: bool): ref Exception =
+            try: 
+                if is_dir: victim.removeDir() else: victim.removeFile()
+            except: return getCurrentException()
+        reset_watcher()
+        # Actual deletion.
         for idx, entry in self.active.selected_entries:
             let victim = self.active.path / entry.name
-            if entry.is_dir: victim.removeDir() else: victim.removeFile()
+            wait_task spawn victim.deleter(entry.is_dir)
             self.active.dirty = true
-            result.inc # Counting deleted.
+        # Finalization.
         self.active.refresh()
         sync(self.active)
 
     proc receive(self: MultiViewer, list: seq[string]) =
+        # Init setup.
         var last_transferred: string
+        reset_watcher()
+        # Receiver loop.
         for src in list:
             if transfer(src, self.active.path / src.extractFilename, copyDir, copyFile): 
                 last_transferred = src.extractFilename
                 self.active.dirty = true
+        # Finalization.
         if self.active.dirty:
             self.active.refresh().scroll_to_name(last_transferred)
             sync self.active
