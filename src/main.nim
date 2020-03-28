@@ -279,6 +279,9 @@ when not defined(DirViewer):
     proc path_limited(self: DirViewer): string = 
         if path.runeLen > total_width-2: &"…{path.runeSubStr(-total_width+4)}"
         else: path
+    proc selection_valid(self: DirViewer): bool = 
+        let sel = self.selected_entries
+        if sel.len > 1 or sel[0].name != direxit.name: return true
 
     # --Methods goes here:
     proc scroll_to(self: DirViewer, pos = 0): auto {.discardable.} =
@@ -586,11 +589,13 @@ when not defined(ProgressWatch):
         host.loc(host.margin, 0)
         for y in 0..host.vlines(): 
             let 
-                border = if y == midline: "\a\x04█" else: "│"
+                border = if y == midline: "█" else: "│"
                 shift  = elapsed.seconds + 1 * (y - midline)
                 time   = initDuration(seconds = if shift < 0: 0.int64 else: elapsed.seconds + 1 * (y - midline))
-            host.write @[border, if y == midline: "\a\x04" else: "",
-                &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}\a\x03", border, "\n"], DarkGRAY, Black
+            host.loc(host.hlines() div 2 - 5 - (y == midline).int, y)
+            host.write @[border, 
+                center(&"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", 8 + (y==midline).int*2).replace(" ", "|"), 
+                    border], (if y == midline: Lime else: DarkGRAY), Black
         return self
 
     proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
@@ -647,9 +652,9 @@ when not defined(MultiViewer):
         # Actual transfer.
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
-            let is_dir = src.dirExists
-            wait_task spawn src.transferrer(dest, dir_proc, file_proc)
-            return true
+                let is_dir = src.dirExists
+                wait_task spawn src.transferrer(dest, dir_proc, file_proc)
+                return true
 
     template sel_transfer(self: MultiViewer; dir_proc, file_proc: untyped; destructive = false; ren_pattern = "") =
         # Init setup.
@@ -659,13 +664,14 @@ when not defined(MultiViewer):
         reset_watcher()
         # Transfer loop.
         for entry in self.active.selected_entries:
-            let src = self.active.path / entry.name
-            let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
-            if entry.name != direxit.name or transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
-                self.next_viewer.dirty = true
-                if destructive: self.active.dirty = true
-                last_transferred = dest.extractFilename
-            if sel_indexes.len > 0 and entry.name == direxit.name or not destructive: # Selection removal.
+            if entry.name != direxit.name: # No transfer for ..
+                let src = self.active.path / entry.name
+                let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
+                if transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
+                    self.next_viewer.dirty = true
+                    if destructive: self.active.dirty = true
+                    last_transferred = dest.extractFilename
+            if sel_indexes.len > 0 and (entry.name == direxit.name or not destructive): # Selection removal.
                 self.active.switch_selection sel_indexes[0], 0
                 sel_indexes.delete 0
         # Finalization.
@@ -727,13 +733,15 @@ when not defined(MultiViewer):
         cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) => self.navigate path
 
     proc request_moving(self: MultiViewer) =
-        cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
+        if self.active.selection_valid:
+            cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
 
     proc request_new_dir(self: MultiViewer) =
         cmdline.request "Input name for new directory", (name: string) => self.new_dir (name)
 
     proc request_deletion(self: MultiViewer) =
-        if warn(&"Are you sure want to delete {self.active.selected_entries.len} entris") >= 1: delete()
+        if self.active.selection_valid and 
+            warn(&"Are you sure want to delete {self.active.selected_entries.len} entris") >= 1: delete()
 
     proc request_sel_management(self: MultiViewer, new_state = true) =
         cmdline.request "Input " & (if new_state: "" else: "un") & "selection pattern \a\x03<*.*>", (pattern: string) =>
