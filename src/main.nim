@@ -105,6 +105,7 @@ when not defined(TerminalEmu):
         fg, bg:     Color
         palette:    seq[Color]
         margin:     int
+        dbginfo:    bool
 
     # --Properties.
     template hlines(self: TerminalEmu): int = GetScreenWidth() div self.cell.x.int
@@ -163,7 +164,7 @@ when not defined(TerminalEmu):
         BeginDrawing()
         ClearBackground BLACK
         for area in areas: area.update().render()
-        #DrawFPS(0,0)
+        if dbginfo: DrawFPS(0,0)
         EndDrawing()
 
     proc loop_with(self: TerminalEmu, areas: varargs[Area]) = 
@@ -392,7 +393,7 @@ when not defined(DirViewer):
             "Modify time".center(date_col), "\a\x01║\n"], border_color, DARKBLUE
         # List rendering.
         for idx, entry in render_list:
-            let desc = cache_desc(idx)
+            let desc = cache_desc(origin+idx)
             let text_color = if entry.selected: selected_color else: desc.coloring
             host.write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
             host.write @[desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
@@ -575,7 +576,7 @@ when not defined(ProgressWatch):
 
     # --Methods goes here:
     method update(self: ProgressWatch): Area {.discardable.} =
-        discard
+        if task.isReady: abort()
 
     method render(self: ProgressWatch): Area {.discardable.} =
         discard
@@ -654,11 +655,12 @@ when not defined(MultiViewer):
         self.active.refresh.scroll_to_name name
         sync self.active
 
-    proc delete(self: MultiViewer) =
+    proc delete(self: MultiViewer): int {.discardable.} =
         for idx, entry in self.active.selected_entries:
             let victim = self.active.path / entry.name
             if entry.is_dir: victim.removeDir() else: victim.removeFile()
             self.active.dirty = true
+            result.inc # Counting deleted.
         self.active.refresh()
         sync(self.active)
 
