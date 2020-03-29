@@ -8,6 +8,7 @@ when not defined(Meta):
     # --Constants.
     const cmd_cp = when defined(windows): "cp866"
     else: "utf-8"
+    type abort_ex = ReraiseError
 
     # --Service classes:
     type Area {.inheritable.} = ref object
@@ -19,7 +20,7 @@ when not defined(Meta):
         if (getTime() - repeater).inMilliseconds > 110: repeater = getTime(); return true
 
     # --Service procs:
-    template abort(reason = "")     = raise newException(OSError, reason)
+    template abort(reason = "")     = raise newException(abort_ex, reason)
     template control_down(): bool   = KEY_Left_Control.IsKeyDown()  or KEY_Right_Control.IsKeyDown()
     template shift_down(): bool     = KEY_Left_Shift.IsKeyDown()    or KEY_Right_Shift.IsKeyDown()
     template undot(ext: string): string                            = ext.runeSubstr((" " & ext).searchExtPos)
@@ -576,22 +577,24 @@ when not defined(ProgressWatch):
         host:  TerminalEmu
         start: Time
 
+    # --Properties:
+    template elapsed(self: ProgressWatch): Duration = getTime() - self.start
+
     # --Methods goes here:
     method update(self: ProgressWatch): Area {.discardable.} =
+        if WindowShouldClose(): quit()
+        elif KEY_Escape.IsKeyPressed: abort("Task was cancelled by user.")
         return self
 
     method render(self: ProgressWatch): Area {.discardable.} =
         parent.render()
-        let 
-            elapsed = getTime() - start
-            midline = host.vlines() div 2
-        host.margin = host.hlines() div 2 - 5
-        host.loc(host.margin, 0)
+        if self.elapsed.inMilliseconds < 100: return self
+        let midline = host.vlines() div 2
         for y in 0..host.vlines(): 
             let 
                 border = if y == midline: "█" else: "│"
-                shift  = elapsed.seconds + 1 * (y - midline)
-                time   = initDuration(seconds = if shift < 0: 0.int64 else: elapsed.seconds + 1 * (y - midline))
+                shift  = self.elapsed.seconds + 1 * (y - midline)
+                time   = initDuration(seconds = if shift < 0: 0.int64 else: shift)
             host.loc(host.hlines() div 2 - 5 - (y == midline).int, y)
             host.write @[border, 
                 center(&"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", 8 + (y==midline).int*2).replace(" ", "|"), 
@@ -662,6 +665,11 @@ when not defined(MultiViewer):
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
         reset_watcher()
+        # Deffered finalization.
+        defer:
+            if self.next_viewer.dirty: # Only if any changes happened.
+                self.next_viewer.refresh().scroll_to_name(last_transferred)
+                select self.next_index
         # Transfer loop.
         for entry in self.active.selected_entries:
             if entry.name != direxit.name: # No transfer for ..
@@ -674,11 +682,7 @@ when not defined(MultiViewer):
             if sel_indexes.len > 0 and (entry.name == direxit.name or not destructive): # Selection removal.
                 self.active.switch_selection sel_indexes[0], 0
                 sel_indexes.delete 0
-        # Finalization.
-        if self.next_viewer.dirty: # Only if any changes happened.
-            self.next_viewer.refresh().scroll_to_name(last_transferred)
-            select self.next_index
-
+        
     proc copy(self: MultiViewer): int {.discardable.} =
         sel_transfer(self, copyDir, copyFile)
 
@@ -699,6 +703,11 @@ when not defined(MultiViewer):
                 if is_dir: victim.removeDir() else: victim.removeFile()
             except: return getCurrentException()
         reset_watcher()
+        # Deffered finalization.
+        defer:
+            if self.active.dirty:
+                self.active.refresh()
+                sync(self.active)
         # Actual deletion.
         for idx, entry in self.active.selected_entries:
             if entry.name != direxit.name: # No deletion for ..
@@ -706,23 +715,21 @@ when not defined(MultiViewer):
                 wait_task spawn victim.deleter(entry.is_dir)
             else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
-        # Finalization.
-        self.active.refresh()
-        sync(self.active)
 
     proc receive(self: MultiViewer, list: seq[string]) =
         # Init setup.
         var last_transferred: string
         reset_watcher()
+        # Deffered finalization.
+        defer:
+            if self.active.dirty:
+                self.active.refresh().scroll_to_name(last_transferred)
+                sync self.active
         # Receiver loop.
         for src in list:
             if transfer(src, self.active.path / src.extractFilename, copyDir, copyFile): 
                 last_transferred = src.extractFilename
                 self.active.dirty = true
-        # Finalization.
-        if self.active.dirty:
-            self.active.refresh().scroll_to_name(last_transferred)
-            sync self.active
 
     proc manage_selection(self: MultiViewer, pattern = "", new_state = true) =
         let mask = if pattern != "": pattern else: "*.*"
