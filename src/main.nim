@@ -73,8 +73,8 @@ when not defined(Meta):
     const help = @["\a\x03>\a\x01.",
         "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.04",
         "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
-        "===================================================================",
-        "\a\x02ESC:\a\x01    switch between dir view & console view OR deny alert choice",
+        "===================================================================================",
+        "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
         "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
         "\a\x02F5:\a\x01     copy selected entri(s)",
         "\a\x02F6:\a\x01     request moving selected entri(s) with optional renaming",
@@ -97,7 +97,7 @@ when not defined(Meta):
         "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
         "\a\x07Numpad|\a\x02+:\a\x01     reqest pattern for mass selection in current dir",
         "\a\x07Numpad|\a\x02-:\a\x01     reqest pattern for mass deselection in current dir",
-        "==================================================================="]
+        "==================================================================================="]
 # -------------------- #
 when not defined(TerminalEmu):
     type TerminalEmu = ref object
@@ -583,7 +583,7 @@ when not defined(ProgressWatch):
     # --Methods goes here:
     method update(self: ProgressWatch): Area {.discardable.} =
         if WindowShouldClose(): quit()
-        elif KEY_Escape.IsKeyPressed: abort("Task was cancelled by user.")
+        if KEY_Escape.IsKeyPressed: abort("Progress tracking was cancelled by user.")
         return self
 
     method render(self: ProgressWatch): Area {.discardable.} =
