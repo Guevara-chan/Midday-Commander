@@ -576,14 +576,18 @@ when not defined(ProgressWatch):
     type ProgressWatch = ref object of Area
         host:  TerminalEmu
         start: Time
+        cancelled: bool
 
     # --Properties:
     template elapsed(self: ProgressWatch): Duration = getTime() - self.start
 
     # --Methods goes here:
+    proc cancel(self: ProgressWatch) =
+        cancelled = true; abort("Progress tracking was cancelled by user.")
+
     method update(self: ProgressWatch): Area {.discardable.} =
         if WindowShouldClose(): quit()
-        if KEY_Escape.IsKeyPressed: abort("Progress tracking was cancelled by user.")
+        elif KEY_Escape.IsKeyPressed: cancel()
         return self
 
     method render(self: ProgressWatch): Area {.discardable.} =
