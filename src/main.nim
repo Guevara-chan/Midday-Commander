@@ -1,5 +1,5 @@
 import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings, threadpool
-from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, `==`, `$`
+from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
 import raylib
 {.this: self.}
 
@@ -593,16 +593,16 @@ when not defined(ProgressWatch):
     method render(self: ProgressWatch): Area {.discardable.} =
         parent.render()
         if self.elapsed.inMilliseconds < 100: return self
-        let midline = host.vlines() div 2
-        for y in 0..host.vlines(): 
+        let midline = host.vlines div 2
+        for y in 0..host.vlines: 
             let 
-                border = if y == midline: "█" else: "│"
                 shift  = self.elapsed.seconds + 1 * (y - midline)
                 time   = initDuration(seconds = if shift < 0: 0.int64 else: shift)
-            host.loc(host.hlines() div 2 - 5 - (y == midline).int, y)
-            host.write @[border, 
-                center(&"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", 8 + (y==midline).int*2).replace(" ", "|"), 
-                    border], (if y == midline: Lime else: DarkGRAY), Black
+                border = if y == midline: "█|" else: "│"
+
+            host.loc(host.hlines() div 2 - 4 - border.len, y)
+            host.write @[border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], 
+                (if y == midline: Lime else: DarkGRAY), Black
         return self
 
     proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
