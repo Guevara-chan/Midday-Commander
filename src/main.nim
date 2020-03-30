@@ -190,8 +190,8 @@ when not defined(TerminalEmu):
         var glyphs: array[486, int]
         for i in 0..glyphs.high: glyphs[i] = i
         let extra_chars = @[
-            0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0x2192,
-                0xB7,0xB0,0xA0
+            0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0x2192,0x2584,
+                0x2580,0xB7,0xB0,0xA0
             ] & lc[x | (x <- 0x410..0x451), int]
         glyphs[0x80..0x80+extra_chars.len-1] = extra_chars
         # Terminal object.
@@ -598,11 +598,12 @@ when not defined(ProgressWatch):
             let 
                 shift  = self.elapsed.seconds + 1 * (y - midline)
                 time   = initDuration(seconds = if shift < 0: 0.int64 else: shift)
-                border = if y == midline: "█|" else: "│"
-
-            host.loc(host.hlines() div 2 - 4 - border.len, y)
-            host.write @[border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], 
-                (if y == midline: Lime else: DarkGRAY), Black
+                (border, color) = if y == midline: ("█|", Lime)
+                    elif y == midline-1: ("▄│", Lime.Fade(0.5))
+                    elif y == midline+1: ("▀│", Lime.Fade(0.5))
+                    else: ("│", DarkGray)
+            host.loc(host.hlines() div 2 - 4 - border.runeLen, y)
+            host.write @[border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], color, Black
         return self
 
     proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
