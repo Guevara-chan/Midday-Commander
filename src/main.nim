@@ -138,7 +138,7 @@ when not defined(TerminalEmu):
         if buffer != "": chunks.add buffer
         # Char render loop.
         for chunk in chunks:
-            if ctrl:                          # Control arg.
+            if ctrl:                             # Control arg.
                 fg = palette[chunk[0].int]
                 ctrl = false
             elif chunk[0] == '\a': ctrl = true   # Control character.
@@ -156,8 +156,11 @@ when not defined(TerminalEmu):
     proc pick(self: TerminalEmu, x = GetMouseX(), y = GetMouseY()): auto =
         (x div cell.x.int, y div cell.y.int)
 
+    proc resize(self: TerminalEmu, hlines, vlines: int) =
+        SetWindowSize hlines * cell.x.int, vlines * cell.y.int
+
     proc adjust(self: TerminalEmu) =
-        SetWindowSize self.hlines * cell.x.int, self.vlines * cell.y.int
+        resize self.hlines, self.vlines
 
     proc update(self: TerminalEmu, areas: varargs[Area]) =
         if IsWindowResized(): self.adjust()
@@ -199,7 +202,7 @@ when not defined(TerminalEmu):
         result = TerminalEmu(font:"res/TerminalVector.ttf".LoadFontEx(12,glyphs.addr,glyphs.len), palette:colors.toSeq)
         result.cell = result.font.MeasureTextEx("0", result.font.baseSize.float32, 0)
         # Finalization.
-        result.adjust()
+        result.resize(110, 33) # Most tested size.
 # -------------------- #
 when not defined(DirEntry):
     type DirEntryDesc = tuple[id: string, metrics: string, time_stamp: string, coloring: Color]
@@ -479,7 +482,7 @@ when not defined(CommandLine):
     method update(self: CommandLine): Area {.discardable.} =
         # Service controls.
         let (x, y) = host.pick()
-        if y == 0 and x >= host.hlines() - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
+        if y == 0 and x >= host.hlines - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
             fullscreen = false
         if KEY_Escape.IsKeyPressed: fullscreen = not fullscreen
         # Deferred output handling.
@@ -522,8 +525,8 @@ when not defined(CommandLine):
         else: host.write @[dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
         let prefix_len = host.hpos() + 2 # 2 - for additonal symbol and pointer.
         let full_len = prefix_len + input.runeLen
-        host.write @[if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines(): "…" else: " ",
-            if full_len >= host.hlines(): input.runeSubstr(-(host.hlines()-prefix_len-2)) else: input, 
+        host.write @[if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines: "…" else: " ",
+            if full_len >= host.hlines: input.runeSubstr(-(host.hlines-prefix_len-2)) else: input, 
                 (if getTime().toUnix %% 2 == 1: "_" else: ""), "\n"], Color(), BLACK
         # Finalization.
         return self
@@ -538,7 +541,7 @@ when not defined(Alert):
         answer:  int
 
     # --Properties:
-    template ypos(self: Alert): int = host.vlines() div 2 - 3
+    template ypos(self: Alert): int = host.vlines div 2 - 3
 
     # --Methods goes here:
     method update(self: Alert): Area {.discardable.} =
@@ -608,10 +611,10 @@ when not defined(ProgressWatch):
                     elif y == midline-1: ("▄", "│", Lime.Fade(0.5))
                     elif y == midline+1: ("▀", "│", Lime.Fade(0.5))
                     else: ("", "│", DarkGray)
-            host.loc(host.hlines() div 2 - 4 - decor.runeLen, y)
+            host.loc(host.hlines div 2 - 4 - decor.runeLen, y)
             host.write decor, color, DarkBlue
             host.write @[border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], color, Black
-            host.write decor, color, DarkBlue
+            host.write decor.reversed, color, DarkBlue
         # Finalzation.
         host.loc(-(self.elapsed.inSeconds.int %% cancel_hint.runeLen), host.vlines - 1)
         host.write cancel_hint.repeat(host.hlines div cancel_hint.runeLen + 2), BLACK, SkyBlue
