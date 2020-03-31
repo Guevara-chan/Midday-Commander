@@ -5,7 +5,7 @@ __Latest version:__ https://github.com/Guevara-chan/Midday-Commander/releases/do
 
 # •Reassembling•
 __Midday Commander__ has been entirelly made in [Nim 1.0.6](https://nim-lang.org) with external [Raylib Forever](https://github.com/Guevara-chan/Raylib-Forever) package by [raysan5](https://github.com/raysan5) and me.  
-You can get `libraylib`.* binraies for recompilation under your target platform here: https://github.com/raysan5/raylib/releases/tag/2.6.0
+You can get `libraylib`.* binraies for recompilation under your target platform here: https://github.com/raysan5/raylib/releases/tag/2.6.0  
 Compilation can be achieved through automated build script provided as `release.nims`.
 
 # •Featuræ•
