@@ -71,7 +71,7 @@ when not defined(Meta):
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
-        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.04",
+        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.05",
         "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
         "===================================================================================",
         "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
@@ -597,7 +597,7 @@ when not defined(ProgressWatch):
         for y in 0..host.vlines: 
             let 
                 shift  = self.elapsed.seconds + 1 * (y - midline)
-                time   = initDuration(seconds = if shift < 0: 0.int64 else: shift)
+                time   = initDuration(seconds = 0.int64.max(shift))
                 (border, color) = if y == midline: ("█|", Lime)
                     elif y == midline-1: ("▄│", Lime.Fade(0.5))
                     elif y == midline+1: ("▀│", Lime.Fade(0.5))
@@ -680,7 +680,7 @@ when not defined(MultiViewer):
             if entry.name != direxit.name: # No transfer for ..
                 let src = self.active.path / entry.name
                 let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
-                if transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
+                if src != self.next_path and transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
                     self.next_viewer.dirty = true
                     if destructive: self.active.dirty = true
                     last_transferred = dest.extractFilename
