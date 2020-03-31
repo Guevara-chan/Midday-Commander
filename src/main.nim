@@ -178,13 +178,14 @@ when not defined(TerminalEmu):
         0.SetExitKey
         getAppDir().setCurrentDir
         # Splash screen.
-        BeginDrawing()
-        ClearBackground DARKBLUE
         let 
             text = "...LOADING..."
             sizing = MeasureTextEx(GetFontDefault(), text, 25, 0)
-        DrawText(text, (GetScreenWidth() - sizing.x.int) div 2, (GetScreenHeight() - sizing.y.int) div 2, 25, RAYWHITE)
-        EndDrawing()
+        for y in 0..1: # Temporary fix for raylib 3.0
+            BeginDrawing()
+            ClearBackground DARKBLUE
+            DrawText(text, (GetScreenWidth()-sizing.x.int) div 2, (GetScreenHeight()-sizing.y.int) div 2, 25, RAYWHITE)
+            EndDrawing()
         SetWindowIcon(LoadImage("res/midday.png"))
         # Font setup.
         var glyphs: array[486, int]
