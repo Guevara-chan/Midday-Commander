@@ -604,12 +604,14 @@ when not defined(ProgressWatch):
             let 
                 shift  = self.elapsed.seconds + 1 * (y - midline)
                 time   = initDuration(seconds = 0.int64.max(shift))
-                (border, color) = if y == midline: ("█|", Lime)
-                    elif y == midline-1: ("▄│", Lime.Fade(0.5))
-                    elif y == midline+1: ("▀│", Lime.Fade(0.5))
-                    else: ("│", DarkGray)
-            host.loc(host.hlines() div 2 - 4 - border.runeLen, y)
+                (decor, border, color) = if y == midline: ("█", "|", Lime)
+                    elif y == midline-1: ("▄", "│", Lime.Fade(0.5))
+                    elif y == midline+1: ("▀", "│", Lime.Fade(0.5))
+                    else: ("", "│", DarkGray)
+            host.loc(host.hlines() div 2 - 4 - decor.runeLen, y)
+            host.write decor, color, DarkBlue
             host.write @[border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], color, Black
+            host.write decor, color, DarkBlue
         # Finalzation.
         host.loc(-(self.elapsed.inSeconds.int %% cancel_hint.runeLen), host.vlines - 1)
         host.write cancel_hint.repeat(host.hlines div cancel_hint.runeLen + 2), BLACK, SkyBlue
