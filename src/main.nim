@@ -577,6 +577,7 @@ when not defined(ProgressWatch):
         host:  TerminalEmu
         start: Time
         cancelled: bool
+    const cancel_hint = " ESC to cancel │"
 
     # --Properties:
     template elapsed(self: ProgressWatch): Duration = getTime() - self.start
@@ -586,15 +587,19 @@ when not defined(ProgressWatch):
         cancelled = true; abort("Progress tracking was cancelled by user.")
 
     method update(self: ProgressWatch): Area {.discardable.} =
-        if WindowShouldClose(): quit()
-        elif KEY_Escape.IsKeyPressed: cancel()
+        let (x, y) = host.pick()
+        if y == host.vlines-1 and MOUSE_Left_Button.IsMouseButtonReleased: cancel()
+        if KEY_Escape.IsKeyPressed: cancel()
+        if WindowShouldClose(): quit()        
         return self
 
     method render(self: ProgressWatch): Area {.discardable.} =
+        # Init setup.
         parent.render()
+        # Timeline render.
         if self.elapsed.inMilliseconds < 100: return self
-        let midline = host.vlines div 2
-        for y in 0..host.vlines: 
+        let midline = host.vlines div 2 - 1
+        for y in 0..host.vlines-2: 
             let 
                 shift  = self.elapsed.seconds + 1 * (y - midline)
                 time   = initDuration(seconds = 0.int64.max(shift))
@@ -604,6 +609,9 @@ when not defined(ProgressWatch):
                     else: ("│", DarkGray)
             host.loc(host.hlines() div 2 - 4 - border.runeLen, y)
             host.write @[border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], color, Black
+        # Finalzation.
+        host.loc(-(self.elapsed.inSeconds.int %% cancel_hint.runeLen), host.vlines - 1)
+        host.write cancel_hint.repeat(host.hlines div cancel_hint.runeLen + 2), BLACK, SkyBlue
         return self
 
     proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
