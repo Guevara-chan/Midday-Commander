@@ -606,7 +606,7 @@ when not defined(ProgressWatch):
         let midline = host.vlines div 2 - 1
         for y in 0..host.vlines-2: 
             let 
-                shift  = self.elapsed.seconds + 1 * (y - midline)
+                shift  = self.elapsed.inSeconds + 1 * (y - midline)
                 time   = initDuration(seconds = 0.int64.max(shift))
                 (decor, border, color) = if y == midline: ("█", "|", Lime)
                     elif y == midline-1: ("▄", "│", Lime.Fade(0.5))
