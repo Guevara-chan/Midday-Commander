@@ -4,7 +4,7 @@ It does terminal visuals without terminal and provides retro vibes using latest 
 __Latest version:__ https://github.com/Guevara-chan/Midday-Commander/releases/download/0.05/Midday.Commander.zip
 
 # •Reassembling•
-__Midday Commander__ has been entirelly made in [Nim 1.0.6](https://nim-lang.org) with external [Raylib Forever](https://github.com/Guevara-chan/Raylib-Forever) package by [raysan5](https://github.com/raysan5) and me.  
+__Midday Commander__ has been entirelly made in [Nim 1.2.0](https://nim-lang.org) with external [Raylib Forever](https://github.com/Guevara-chan/Raylib-Forever) package by [raysan5](https://github.com/raysan5) and me.  
 You can get `libraylib`.* binaries for your target platform here: https://github.com/raysan5/raylib/releases/tag/2.6.0  
 Compilation can be achieved through automated build script provided as `release.nims`.
 
