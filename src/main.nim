@@ -254,9 +254,9 @@ when not defined(DirViewer):
         host: TerminalEmu
         path: string
         list: seq[DirEntry]
-        dirty, active, visible: bool
         dir_stat, sel_stat: BreakDown
         hline, origin, xoffset, file_count: int
+        dirty, active, visible, hl_changed: bool
     const
         hdr_height      = 2
         foot_height     = 3
@@ -294,6 +294,7 @@ when not defined(DirViewer):
         hline = max(0, min(pos, list.len - 1))
         origin = if hline >= origin + self.capacity: hline - self.capacity + 1
         else: min(origin, hline)
+        hl_changed = true
         return self
 
     proc scroll(self: DirViewer, shift = 0) =
@@ -360,6 +361,8 @@ when not defined(DirViewer):
                 list[idx] = entry
 
     method update(self: DirViewer): Area {.discardable.} =
+        # Init setup.
+        hl_changed = false
         # Mouse controls.
         if not active: return self
         scroll -GetMouseWheelMove()
