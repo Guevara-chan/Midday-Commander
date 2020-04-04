@@ -29,7 +29,7 @@ when not defined(Meta):
 
     proc root_dir(path: string): string =
         var child = path
-        while true: (if child.parentDir == "": return child else: child = child.parentDir)
+        while true: (if child.parentDir == ".": return child else: child = child.parentDir)
 
     proc drive_list(): seq[string] =
         when defined(windows):
@@ -42,7 +42,7 @@ when not defined(Meta):
         if IsFileDropped():
             var idx, list_size: int32
             let listing = GetDroppedFiles(list_size.addr)
-            result = lc[$listing[x] | (x <- 0..<list_size), string]
+            result = collect(newSeq): (for x in 0..<list_size: $listing[x])
             ClearDroppedFiles()
 
     proc wildcard_replace(path: string, pattern = "*.*"): string =
@@ -193,10 +193,11 @@ when not defined(TerminalEmu):
         # Font setup.
         var glyphs: array[486, int]
         for i in 0..glyphs.high: glyphs[i] = i
+        let rus_chars = collect(newSeq): (for x in 0x410..0x451: x)
         let extra_chars = @[
             0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0x2192,0x2584,
                 0x2580,0xB7,0xB0,0xA0
-            ] & lc[x | (x <- 0x410..0x451), int]
+            ] & rus_chars
         glyphs[0x80..0x80+extra_chars.len-1] = extra_chars
         # Terminal object.
         result = TerminalEmu(font:"res/TerminalVector.ttf".LoadFontEx(12,glyphs.addr,glyphs.len), palette:colors.toSeq)
@@ -623,6 +624,71 @@ when not defined(ProgressWatch):
     proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
         ProgressWatch(host: term, parent: creator, start: getTime())
 # -------------------- #
+when not defined(FileViewer):
+    type DataLine = tuple[origin: int, chars: seq[char]]
+    type FileViewer = ref object of Area
+        host: TerminalEmu
+        src:  string
+        feed: Stream
+        x, y: int
+        cache: seq[DataLine]
+        fullscreen: bool
+    const dl_cap = ['\0', '\n']
+
+    # --Properties:
+    template hcap(self: FileViewer): int = self.host.hlines * (self.fullscreen.int+1) - 2
+    template vcap(self: FileViewer): int = self.host.vlines-2
+    template screencap(self: FileViewer): int = self.hcap * self.vcap
+
+    # --Methods goes here:
+    proc close(self: FileViewer) =
+        if feed != nil:
+            feed.close()
+            feed = nil
+        src = ""
+        cache.setLen 0
+        (x, y) = (0, 0)
+
+    proc open(self: FileViewer, path: string) =
+        close()
+        feed = path.newFileStream fmRead
+        src  = path.absolutePath
+
+    proc read_data_line(self: FileViewer): DataLine =
+        let origin = feed.getPosition
+        var buffer: seq[char]
+        while not feed.atEnd:
+            let chr = feed.readChar
+            buffer.add chr
+            if chr in dl_cap: break
+        return (origin, buffer)
+
+    proc read_fragment(self: FileViewer, pos = -1, size = -1.BiggestInt) =
+        # Init setup.
+        if pos != -1: feed.setPosition pos
+        var to_read = min(src.getFileSize - feed.getPosition, if size > -1: size else: BiggestInt.high)
+        # Actual reading.
+        while to_read > 0:
+            discard
+        # let 
+        #     bytes = if size == -1: self.screencap else: size
+        #     diff = (pos + bytes) - cache.len
+        # if diff > 0: cache.setLen cache.len + diff
+        # discard feed.readData(cache[feed.getPosition].addr, bytes)
+   
+    method update(self: FileViewer): Area {.discardable.} =
+        return self
+
+    method render(self: FileViewer): Area {.discardable.} =
+        return self
+
+    proc newFileViewer(term: TerminalEmu, src = ""): FileViewer =
+        result = FileViewer(host: term)
+        if src != "": result.open src
+
+    proc destroy(self: FileViewer) =
+        close()
+# -------------------- #
 when not defined(MultiViewer):
     type MultiViewer = ref object of Area
         host:    TerminalEmu
@@ -630,6 +696,7 @@ when not defined(MultiViewer):
         cmdline: CommandLine
         error:   tuple[msg: string, time: Time]
         dirty:   bool
+        fviewer: FileViewer
         watcher: ProgressWatch
         current, f_key: int
 
@@ -638,6 +705,7 @@ when not defined(MultiViewer):
     template next_index(self: MultiViewer): int         = (self.current+1) %% self.viewers.len
     template next_viewer(self: MultiViewer): DirViewer  = self.viewers[self.next_index]
     template next_path(self: MultiViewer): string       = self.next_viewer.path
+    template previewing(self: MultiViewer): bool        = self.fviewer != nil and not self.fviewer.fullscreen
 
     # --Methods goes here:
     proc select(self: MultiViewer, idx: int = 0) =
@@ -701,8 +769,12 @@ when not defined(MultiViewer):
             if sel_indexes.len > 0 and (entry.name == direxit.name or not destructive): # Selection removal.
                 self.active.switch_selection sel_indexes[0], 0
                 sel_indexes.delete 0
+
+    proc inspect(self: MultiViewer) =
+        let target = self.active.path / self.active.hentry.name
+        if fviewer.isNil: fviewer = newFileViewer(host, target) else: fviewer.open target
         
-    proc copy(self: MultiViewer): int {.discardable.} =
+    proc copy(self: MultiViewer) =
         sel_transfer(self, copyDir, copyFile)
 
     proc move(self: MultiViewer, ren_pattern = "") =
@@ -749,6 +821,9 @@ when not defined(MultiViewer):
             if transfer(src, self.active.path / src.extractFilename, copyDir, copyFile): 
                 last_transferred = src.extractFilename
                 self.active.dirty = true
+
+    proc switch_inspector(self: MultiViewer) =
+        if fviewer.isNil: inspect() else: fviewer.destroy(); fviewer = nil
 
     proc manage_selection(self: MultiViewer, pattern = "", new_state = true) =
         let mask = if pattern != "": pattern else: "*.*"
@@ -802,6 +877,7 @@ when not defined(MultiViewer):
                     elif y == host.vlines - service_height: cmdline.paste(droplist[0])
                 # Keyboard controls.
                 if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help: cmdline.record(hint))
+                elif f_key==3 or KEY_F3.IsKeyPressed:   switch_inspector()
                 elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
                 elif f_key==6 or KEY_F6.IsKeyPressed:   request_moving()
                 elif f_key==7 or KEY_F7.IsKeyPressed:   request_new_dir()
