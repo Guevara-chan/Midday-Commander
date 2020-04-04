@@ -771,8 +771,12 @@ when not defined(MultiViewer):
                 sel_indexes.delete 0
 
     proc inspect(self: MultiViewer) =
-        let target = self.active.path / self.active.hentry.name
-        if fviewer.isNil: fviewer = newFileViewer(host, target) else: fviewer.open target
+        let 
+            target = self.active.hentry
+            path = self.active.path / self.active.hentry.name
+        if target.is_dir: self.next_viewer.chdir path           # Viewing directory.
+        elif fviewer.isNil: fviewer = newFileViewer(host, path) # Opening new fileviewer.
+        else: fviewer.open path                                 # Reusing existing fileviewer.
         
     proc copy(self: MultiViewer) =
         sel_transfer(self, copyDir, copyFile)
