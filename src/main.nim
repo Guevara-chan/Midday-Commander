@@ -280,14 +280,22 @@ when not defined(DirViewer):
     proc selected_entries(self: DirViewer): seq[DirEntry] =
         for idx, entry in list: (if entry.selected: result.add entry)
         if result.len == 0: result.add self.hentry
+
     proc selected_indexes(self: DirViewer): seq[int] =
         for idx, entry in list: (if entry.selected: result.add idx)
+
     proc path_limited(self: DirViewer): string = 
         if path.runeLen > total_width-2: &"…{path.runeSubStr(-total_width+4)}"
         else: path
+
     proc selection_valid(self: DirViewer): bool = 
         let sel = self.selected_entries
         if sel.len > 1 or sel[0].name != direxit.name: return true
+
+    iterator render_list(self: DirViewer): tuple[index: int, val: DirEntry] =
+            var fragment: seq[DirEntry] = list[origin..^1]
+            fragment.setLen(self.capacity)
+            for idx, entry in fragment: yield (origin + idx, entry)
 
     # --Methods goes here:
     proc scroll_to(self: DirViewer, pos = 0): auto {.discardable.} =
@@ -392,9 +400,7 @@ when not defined(DirViewer):
 
     method render(self: DirViewer): Area {.discardable.} =
         # Init setup.
-        if not visible: return self
-        var render_list: seq[DirEntry] = list[origin..^1]
-        render_list.setLen(self.capacity)
+        if not visible: return self        
         host.margin = xoffset
         host.loc(xoffset, 0)
         # Header rendering.
@@ -404,12 +410,12 @@ when not defined(DirViewer):
         host.write @["║\a\x02", "Name".center(name_col), "\a\x01│\a\x02", "Size".center(size_col), "\a\x01│\a\x02",
             "Modify time".center(date_col), "\a\x01║\n"], border_color, DARKBLUE
         # List rendering.
-        for idx, entry in render_list:
-            let desc = cache_desc(origin+idx)
+        for idx, entry in self.render_list:
+            let desc = cache_desc(idx)
             let text_color = if entry.selected: selected_color else: desc.coloring
             host.write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
             host.write @[desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
-                if active and idx == self.hindex: hl_color else: DARKBLUE # Highlight line.
+                if active and idx == hline: hl_color else: DARKBLUE # Highlight line.
             host.write @[desc.metrics.fit(size_col), "\a\x01│"], text_color
             host.write desc.time_stamp.fit_left(date_col), text_color
             host.write @["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
@@ -633,15 +639,21 @@ when not defined(FileViewer):
         host: TerminalEmu
         src:  string
         feed: Stream
-        x, y: int
         cache: seq[DataLine]
         fullscreen: bool
+        x, y, xoffset: int
     const dl_cap = ['\0', '\n']
 
     # --Properties:
-    template hcap(self: FileViewer): int = self.host.hlines * (self.fullscreen.int+1) - 2
-    template vcap(self: FileViewer): int = self.host.vlines-2
-    template screencap(self: FileViewer): int = self.hcap * self.vcap
+    template hcap(self: FileViewer): int        = self.host.hlines * (self.fullscreen.int+1) - 2
+    template vcap(self: FileViewer): int        = self.host.vlines-2
+    template screencap(self: FileViewer): int   = self.hcap * self.vcap
+
+    iterator render_list(self: FileViewer): tuple[index: int, val: string] =
+        var fragment = cache[y..^1]
+        fragment.setLen self.vcap
+        for idx, data in fragment: 
+            yield (idx, data.chars.join "")
 
     # --Methods goes here:
     proc close(self: FileViewer) =
@@ -683,10 +695,17 @@ when not defined(FileViewer):
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
+        # Init setup.
+        host.margin = xoffset
+        host.loc(xoffset, 0)
+        # Rendering loop.
+        host.write @["╔", "═".repeat(self.hcap), "╗"], border_color, DARKBLUE
+        host.write @["╚", "═".repeat(self.hcap), "╝"]
+        # Finalization.
         return self
 
-    proc newFileViewer(term: TerminalEmu, src = ""): FileViewer =
-        result = FileViewer(host: term)
+    proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
+        result = FileViewer(host: term, xoffset: xoffset)
         if src != "": result.open src
 
     proc destroy(self: FileViewer) =
@@ -778,7 +797,7 @@ when not defined(MultiViewer):
             target = self.active.hentry
             path = self.active.path / self.active.hentry.name
         if target.is_dir: self.next_viewer.chdir path           # Viewing directory.
-        elif fviewer.isNil: fviewer = newFileViewer(host, path) # Opening new fileviewer.
+        elif fviewer.isNil: fviewer = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer.
         else: fviewer.open path                                 # Reusing existing fileviewer.
         
     proc copy(self: MultiViewer) =
