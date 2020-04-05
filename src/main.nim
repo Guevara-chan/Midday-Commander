@@ -277,16 +277,16 @@ when not defined(DirViewer):
     template hentry(self: DirViewer): DirEntry  = self.list[self.hline]
     template hpath(self: DirViewer): string     = self.path / self.hentry.name
 
+    proc path_limited(self: DirViewer): string = 
+        if path.runeLen > total_width-2: &"…{path.runeSubStr(-total_width+4)}"
+        else: path
+
     proc selected_entries(self: DirViewer): seq[DirEntry] =
         for idx, entry in list: (if entry.selected: result.add entry)
         if result.len == 0: result.add self.hentry
 
     proc selected_indexes(self: DirViewer): seq[int] =
         for idx, entry in list: (if entry.selected: result.add idx)
-
-    proc path_limited(self: DirViewer): string = 
-        if path.runeLen > total_width-2: &"…{path.runeSubStr(-total_width+4)}"
-        else: path
 
     proc selection_valid(self: DirViewer): bool = 
         let sel = self.selected_entries
@@ -404,23 +404,23 @@ when not defined(DirViewer):
         host.margin = xoffset
         host.loc(xoffset, 0)
         # Header rendering.
-        host.write @["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
+        host.write ["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
         host.loc((total_width - self.path_limited.runeLen) div 2 + xoffset, host.vpos())
-        host.write @[" ", self.path_limited, " \n"], (if active: hl_color else: direxit.coloring), DARKGRAY
-        host.write @["║\a\x02", "Name".center(name_col), "\a\x01│\a\x02", "Size".center(size_col), "\a\x01│\a\x02",
+        host.write [" ", self.path_limited, " \n"], (if active: hl_color else: direxit.coloring), DARKGRAY
+        host.write ["║\a\x02", "Name".center(name_col), "\a\x01│\a\x02", "Size".center(size_col), "\a\x01│\a\x02",
             "Modify time".center(date_col), "\a\x01║\n"], border_color, DARKBLUE
         # List rendering.
         for idx, entry in self.render_list:
             let desc = cache_desc(idx)
             let text_color = if entry.selected: selected_color else: desc.coloring
             host.write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
-            host.write @[desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
+            host.write [desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
                 if active and idx == hline: hl_color else: DARKBLUE # Highlight line.
-            host.write @[desc.metrics.fit(size_col), "\a\x01│"], text_color
+            host.write [desc.metrics.fit(size_col), "\a\x01│"], text_color
             host.write desc.time_stamp.fit_left(date_col), text_color
-            host.write @["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
+            host.write ["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
         # 1st footline rendering.
-        host.write @["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
+        host.write ["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
         # Entry fullname row rendering.
         var 
@@ -429,10 +429,10 @@ when not defined(DirViewer):
         if ext != "" and ext.runeLen < total_width and not hentry().is_dir: # Adding separate extension cell.
             entry_id = entry_id.changeFileExt ""
             let left_col = total_width - ext.runeLen - 1
-            host.write @[entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col: "…" else: "\u2192"],
+            host.write [entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col: "…" else: "\u2192"],
                 hentry().coloring
-            host.write @[ext, "\a\x01║\n"], hentry().coloring
-        else: host.write @[entry_id.fit_left(total_width), "\a\x01", if entry_id.runeLen>total_width:"…" else:"║","\n"],
+            host.write [ext, "\a\x01║\n"], hentry().coloring
+        else: host.write [entry_id.fit_left(total_width), "\a\x01", if entry_id.runeLen>total_width:"…" else:"║","\n"],
             hentry().coloring
         # 2nd footline rendering.
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
@@ -473,8 +473,8 @@ when not defined(CommandLine):
         let command = (if cmd != "": cmd else: input)
         record(&"\a\x03>>\a\x04{command}")
         shell = when defined(windows): 
-              startProcess "cmd.exe",   dir_feed().path, @["/c", command], nil, {poStdErrToStdOut, poDaemon}
-        else: startProcess "/bin/bash", dir_feed().path, @[command, "|| exit"]
+              startProcess "cmd.exe",   dir_feed().path, ["/c", command], nil, {poStdErrToStdOut, poDaemon}
+        else: startProcess "/bin/bash", dir_feed().path, [command, "|| exit"]
         input = ""
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
@@ -522,7 +522,7 @@ when not defined(CommandLine):
     method render(self: CommandLine): Area {.discardable.} =
         # Output log.
         if self.exclusive: 
-            for line in log[origin..<min(log.len, origin+host.hlines)]: host.write @[line, $'\n'], GRAY
+            for line in log[origin..<min(log.len, origin+host.hlines)]: host.write [line, $'\n'], GRAY
             if fullscreen:
                 host.loc(host.hlines - exit_hint.len, 0)
                 host.write exit_hint, BLACK, DARKGRAY
@@ -531,11 +531,11 @@ when not defined(CommandLine):
         host.margin = 0
         host.write "\n"
         host.margin = -2
-        if prompt != "": host.write @[prompt, "\a\x06"], BLACK, ORANGE
-        else: host.write @[dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
+        if prompt != "": host.write [prompt, "\a\x06"], BLACK, ORANGE
+        else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
         let prefix_len = host.hpos() + 2 # 2 - for additonal symbol and pointer.
         let full_len = prefix_len + input.runeLen
-        host.write @[if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines: "…" else: " ",
+        host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines: "…" else: " ",
             if full_len >= host.hlines: input.runeSubstr(-(host.hlines-prefix_len-2)) else: input, 
                 (if getTime().toUnix %% 2 == 1: "_" else: ""), "\n"], Color(), BLACK
         # Finalization.
@@ -578,7 +578,7 @@ when not defined(Alert):
         host.margin = 0
         let delim = "█ ".repeat host.hlines div 2
         host.loc(0, self.ypos)        
-        host.write @[delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", message.center(host.hlines), "\n\a\x03", 
+        host.write [delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", message.center(host.hlines), "\n\a\x03", 
             "<Yes/No>".center(host.hlines), "\n\a\x08 ", delim], MAROON, BLACK
         return self
 
@@ -623,7 +623,7 @@ when not defined(ProgressWatch):
                     else: ("", "│", DarkGray)
             host.loc(host.hlines div 2 - 4 - decor.runeLen, y)
             host.write decor, color, DarkBlue
-            host.write @[border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], color, Black
+            host.write [border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], color, Black
             host.write decor.reversed, color, DarkBlue
         # Finalzation.
         host.loc(-(self.elapsed.inSeconds.int %% cancel_hint.runeLen), host.vlines - 1)
@@ -678,20 +678,9 @@ when not defined(FileViewer):
             if chr in dl_cap: break
         return (origin, buffer)
 
-    proc read_fragment(self: FileViewer, pos = -1, size = -1.BiggestInt) =
-        # Init setup.
-        if pos != -1: feed.setPosition pos
-        var to_read = min(src.getFileSize - feed.getPosition, if size > -1: size else: BiggestInt.high)
-        # Actual reading.
-        while to_read > 0:
-            discard
-        # let 
-        #     bytes = if size == -1: self.screencap else: size
-        #     diff = (pos + bytes) - cache.len
-        # if diff > 0: cache.setLen cache.len + diff
-        # discard feed.readData(cache[feed.getPosition].addr, bytes)
-   
     method update(self: FileViewer): Area {.discardable.} =
+        while cache.len < y + self.vcap:
+            cache.add read_data_line()
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -699,8 +688,10 @@ when not defined(FileViewer):
         host.margin = xoffset
         host.loc(xoffset, 0)
         # Rendering loop.
-        host.write @["╔", "═".repeat(self.hcap), "╗"], border_color, DARKBLUE
-        host.write @["╚", "═".repeat(self.hcap), "╝"]
+        host.write ["╔", "═".repeat(self.hcap), "╗"], border_color, DARKBLUE
+        for idx, line in render_list():
+            host.write ["║", line.fit(self.hcap), "║"]
+        host.write ["╚", "═".repeat(self.hcap), "╝"]
         # Finalization.
         return self
 
@@ -939,7 +930,7 @@ when not defined(MultiViewer):
             var idx: int
             for hint in "Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit".split("|"):
                 idx.inc()
-                host.write @["   F", $idx], 
+                host.write ["   F", $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
                 host.write hint.center(6), BLACK, if idx in [1, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
         # Finalization.
