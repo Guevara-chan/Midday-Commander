@@ -198,7 +198,7 @@ when not defined(TerminalEmu):
         let rus_chars = collect(newSeq): (for x in 0x410..0x451: x)
         let extra_chars = @[
             0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0x2192,0x2584,
-                0x2580,0xB7,0xB0,0xA0
+                0x2580,0x2524,0x2552,0x2558,0x2555,0x255B,0x251C,0xB7,0xB0,0xA0
             ] & rus_chars
         glyphs[0x80..0x80+extra_chars.len-1] = extra_chars
         # Terminal object.
@@ -697,12 +697,15 @@ when not defined(FileViewer):
         host.margin = xoffset
         host.loc(xoffset, 0)
         # Rendering loop.
-        host.write ["╔", "═".repeat(self.hcap), "╗\n"], border_color, DARKBLUE.Fade(0.7)
+        host.write ["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade(0.7)
+        let 
+            lborder = if xoffset > 0: "┤" else: "│"
+            rborder = (if xoffset < host.hlines - self.hcap: "├" else: "│") & "\n"
         for idx, line in render_list():
-            host.write "║"
+            host.write lborder
             host.write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
-            host.write "║\n", border_color
-        host.write ["╚", "═".repeat(self.hcap), "╝"]
+            host.write rborder, border_color
+        host.write ["╘", "═".repeat(self.hcap), "╛"]
         # Finalization.
         return self
 
@@ -710,8 +713,9 @@ when not defined(FileViewer):
         result = FileViewer(host: term, xoffset: xoffset)
         if src != "": result.open src
 
-    proc destroy(self: FileViewer) =
+    proc destroy(self: FileViewer): FileViewer {.discardable.} =
         close()
+        return nil
 # -------------------- #
 when not defined(MultiViewer):
     type MultiViewer = ref object of Area
@@ -720,7 +724,7 @@ when not defined(MultiViewer):
         cmdline: CommandLine
         error:   tuple[msg: string, time: Time]
         dirty:   bool
-        fviewer: FileViewer
+        inspector: FileViewer
         watcher: ProgressWatch
         current, f_key: int
 
@@ -729,7 +733,7 @@ when not defined(MultiViewer):
     template next_index(self: MultiViewer): int         = (self.current+1) %% self.viewers.len
     template next_viewer(self: MultiViewer): DirViewer  = self.viewers[self.next_index]
     template next_path(self: MultiViewer): string       = self.next_viewer.path
-    template previewing(self: MultiViewer): bool        = self.fviewer != nil and not self.fviewer.fullscreen
+    template previewing(self: MultiViewer): bool        = self.inspector != nil and not self.inspector.fullscreen
 
     # --Methods goes here:
     proc select(self: MultiViewer, idx: int = 0) =
@@ -794,14 +798,17 @@ when not defined(MultiViewer):
                 self.active.switch_selection sel_indexes[0], 0
                 sel_indexes.delete 0
 
+    proc uninspect(self: MultiViewer) =
+        inspector = inspector.destroy()
+
     proc inspect(self: MultiViewer) =
         let 
             target = self.active.hentry
             path = self.active.path / self.active.hentry.name
         if target.is_dir: self.next_viewer.chdir path           # Viewing directory.
-        elif fviewer.isNil: fviewer = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer.
-        else: fviewer.open path                                 # Reusing existing fileviewer.
-        
+        elif inspector.isNil: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer.
+        else: inspector.open path                                 # Reusing existing fileviewer.
+
     proc copy(self: MultiViewer) =
         sel_transfer(self, copyDir, copyFile)
 
@@ -851,7 +858,7 @@ when not defined(MultiViewer):
                 self.active.dirty = true
 
     proc switch_inspector(self: MultiViewer) =
-        if fviewer.isNil: inspect() else: fviewer.destroy(); fviewer = nil
+        if inspector.isNil: inspect() else: uninspect()
 
     proc manage_selection(self: MultiViewer, pattern = "", new_state = true) =
         let mask = if pattern != "": pattern else: "*.*"
@@ -917,8 +924,10 @@ when not defined(MultiViewer):
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
                 # File viewer update.
-                if self.previewing and self.active.hl_changed and not self.active.hentry.is_dir: inspect()
-                if fviewer != nil: fviewer.update()
+                if self.previewing:
+                    inspector.xoffset = self.next_viewer.xoffset
+                    if self.active.hl_changed and not self.active.hentry.is_dir: inspect()
+                if inspector != nil: inspector.update()
                 # Viewer update.
                 self.active.update()
                 if dirty:
@@ -936,7 +945,7 @@ when not defined(MultiViewer):
         # Commandlione/viewers render.
         if not cmdline.exclusive:
             let displaced = if self.previewing: self.next_viewer() else: nil
-            for view in viewers: (if view == displaced: fviewer else: view).render()
+            for view in viewers: (if view == displaced: inspector else: view).render()
         cmdline.render()
         let 
             hint_width  = 6
