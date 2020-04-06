@@ -644,11 +644,13 @@ when not defined(FileViewer):
         cache: seq[DataLine]
         fullscreen: bool
         x, y, xoffset: int
-    const dl_cap = ['\n']
+    const 
+        dl_cap = ['\n']
+        border_width = 2
 
     # --Properties:
-    template hcap(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int) - 2
-    template vcap(self: FileViewer): int        = self.host.vlines - 2 * (2 - self.fullscreen.int)
+    template hcap(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int) - border_width
+    template vcap(self: FileViewer): int        = self.host.vlines - border_width * (2 - self.fullscreen.int)
     template screencap(self: FileViewer): int   = self.hcap * self.vcap
     template feed_avail(self: FileViewer): bool = not feed.isNil
 
@@ -668,9 +670,10 @@ when not defined(FileViewer):
         (x, y) = (0, 0)
 
     proc open(self: FileViewer, path: string, force = false) =
-        close()
-        if force or path != src: feed = path.newFileStream fmRead
-        src  = path.absolutePath
+        if force or path != src: 
+            close()
+            feed = path.newFileStream fmRead
+        src = path.absolutePath
 
     proc read_data_line(self: FileViewer): DataLine =
         if self.feed_avail: # If reading is possible:
@@ -700,12 +703,15 @@ when not defined(FileViewer):
         host.write ["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade(0.7)
         let 
             lborder = if xoffset > 0: "┤" else: "│"
-            rborder = (if xoffset < host.hlines - self.hcap: "├" else: "│") & "\n"
+            rborder = (if xoffset < host.hlines - self.hcap - border_width: "├" else: "│") & "\n"
         for idx, line in render_list():
             host.write lborder
             host.write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             host.write rborder, border_color
+        # Footing render.
         host.write ["╘", "═".repeat(self.hcap), "╛"]
+        host.loc((self.hcap - self.src.runeLen) div 2 + xoffset, host.vpos())
+        host.write [" ", self.src.extractFilename, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
         # Finalization.
         return self
 
