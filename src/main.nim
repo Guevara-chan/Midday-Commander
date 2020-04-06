@@ -140,11 +140,11 @@ when not defined(TerminalEmu):
         else: chunks = @[txt]
         # Char render loop.
         for chunk in chunks:
-            if ctrl:                             # Control arg.
+            if ctrl:                                         # Control arg.
                 fg = palette[chunk[0].int]
                 ctrl = false
-            elif chunk[0] == '\a': ctrl = true   # Control character.
-            elif chunk[0] != '\n':
+            elif chunk[0] == '\a' and not raw: ctrl = true   # Control character.
+            elif raw or chunk[0] != '\n':
                 let width = cell.x * chunk.runeLen.float
                 cur.DrawRectangleV(Vector2(x: width, y: cell.y), bg)
                 if chunk != " ": font.DrawTextEx(chunk, cur, font.baseSize.float32, 0, fg)
@@ -667,9 +667,9 @@ when not defined(FileViewer):
         cache.setLen 0
         (x, y) = (0, 0)
 
-    proc open(self: FileViewer, path: string) =
+    proc open(self: FileViewer, path: string, force = false) =
         close()
-        feed = path.newFileStream fmRead
+        if force or path != src: feed = path.newFileStream fmRead
         src  = path.absolutePath
 
     proc read_data_line(self: FileViewer): DataLine =
@@ -949,7 +949,7 @@ when not defined(MultiViewer):
         cmdline.render()
         let 
             hint_width  = 6
-            prefix      = " ".repeat(host.hlines div 11 - hint_width) & "F"
+            prefix      = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
         if cmdline.exclusive: return
         # Hints.
         if error.msg != "": # Error message.
