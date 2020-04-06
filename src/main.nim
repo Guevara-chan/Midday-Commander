@@ -1,6 +1,6 @@
-import os, osproc, strutils, algorithm, sequtils, times, streams, sugar, strformat, browsers, encodings, threadpool
+import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, threadpool
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import raylib
+import browsers, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -644,12 +644,13 @@ when not defined(FileViewer):
         cache: seq[DataLine]
         fullscreen: bool
         x, y, xoffset: int
-    const dl_cap = ['\0', '\n']
+    const dl_cap = ['\n']
 
     # --Properties:
     template hcap(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int) - 2
     template vcap(self: FileViewer): int        = self.host.vlines - 2 * (2 - self.fullscreen.int)
     template screencap(self: FileViewer): int   = self.hcap * self.vcap
+    template feed_avail(self: FileViewer): bool = not feed.isNil
 
     iterator render_list(self: FileViewer): tuple[index: int, val: string] =
         var fragment = cache[y..^1]
@@ -672,18 +673,23 @@ when not defined(FileViewer):
         src  = path.absolutePath
 
     proc read_data_line(self: FileViewer): DataLine =
-        if not feed.isNil: # Is reading is possible:
+        if self.feed_avail: # If reading is possible:
             let origin = feed.getPosition
             var buffer: seq[char]
             while not feed.atEnd:
                 let chr = feed.readChar
                 buffer.add chr
                 if chr in dl_cap: break
-            return (origin, buffer)
+            return (origin, buffer)            
 
     method update(self: FileViewer): Area {.discardable.} =
-        while cache.len < y + self.vcap:
-           cache.add read_data_line()
+        if self.feed_avail: # Data pumping
+            while cache.len < y + self.vcap:
+               cache.add read_data_line()
+        else: cache = collect(newSeq): # Noise garden.
+            for y in 0..<self.vcap:
+                let noise = collect(newSeq): (for x in 0..<self.hcap: "    01".sample)
+                (0, noise)                
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -694,7 +700,7 @@ when not defined(FileViewer):
         host.write ["╔", "═".repeat(self.hcap), "╗\n"], border_color, DARKBLUE.Fade(0.7)
         for idx, line in render_list():
             host.write "║"
-            host.write line.fit_left(self.hcap), RayWhite, raw=true
+            host.write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             host.write "║\n", border_color
         host.write ["╚", "═".repeat(self.hcap), "╝"]
         # Finalization.
@@ -911,9 +917,8 @@ when not defined(MultiViewer):
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
                 # File viewer update.
-                if fviewer != nil: 
-                    if self.active.hl_changed and not self.active.hentry.is_dir: inspect()
-                    fviewer.update()
+                if self.previewing and self.active.hl_changed and not self.active.hentry.is_dir: inspect()
+                if fviewer != nil: fviewer.update()
                 # Viewer update.
                 self.active.update()
                 if dirty:
@@ -933,7 +938,9 @@ when not defined(MultiViewer):
             let displaced = if self.previewing: self.next_viewer() else: nil
             for view in viewers: (if view == displaced: fviewer else: view).render()
         cmdline.render()
-        let prefix = " ".repeat(host.hlines div 30) & "F"
+        let 
+            hint_width  = 6
+            prefix      = " ".repeat(host.hlines div 11 - hint_width) & "F"
         if cmdline.exclusive: return
         # Hints.
         if error.msg != "": # Error message.
@@ -944,7 +951,8 @@ when not defined(MultiViewer):
                 idx.inc()
                 host.write [prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
-                host.write hint.center(6), BLACK, if idx in [1, 3, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
+                host.write hint.center(hint_width), BLACK, 
+                    if idx==3 and self.previewing: Magenta elif idx in [1, 3, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
         # Finalization.
         return self
 
