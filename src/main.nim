@@ -121,21 +121,23 @@ when not defined(TerminalEmu):
     proc loc(self: TerminalEmu, x = 0, y = 0) =
         loc_precise((x.float * cell.x).int, (y.float * cell.y).int)
 
-    proc write(self: TerminalEmu, txt: string; fg_init = Color(), bg_init = Color()) =
+    proc write(self: TerminalEmu, txt: string, fg_init = Color(), bg_init = Color(); raw = false) =
         # Init setup.
         var ctrl: bool
         if fg_init.a > 0.uint8: fg = fg_init
         if bg_init.a > 0.uint8: bg = bg_init
         # Buffering.
         var chunks: seq[string]
-        var buffer: string
-        for chr in txt.runes:
-            if chr.int > 31: buffer &= $chr
-            else: 
-                if buffer != "": chunks.add buffer
-                buffer = ""
-                chunks.add $chr
-        if buffer != "": chunks.add buffer
+        if not raw: # Buffering with control characters.            
+            var buffer: string
+            for chr in txt.runes:
+                if chr.int > 31: buffer &= $chr
+                else: 
+                    if buffer != "": chunks.add buffer
+                    buffer = ""
+                    chunks.add $chr
+            if buffer != "": chunks.add buffer
+        else: chunks = @[txt]
         # Char render loop.
         for chunk in chunks:
             if ctrl:                             # Control arg.
@@ -149,9 +151,9 @@ when not defined(TerminalEmu):
                 cur.x += width
             else: loc_precise(margin * cell.x.int, (cur.y + cell.y).int) # new line.
 
-    proc write(self: TerminalEmu, chunks: open_array[string], fg_init = Color(), bg_init = Color()) =
+    proc write(self: TerminalEmu, chunks: open_array[string], fg_init = Color(), bg_init = Color(), raw = false) =
         write "", fg_init, bg_init
-        for chunk in chunks: write chunk
+        for chunk in chunks: write chunk, raw=raw
 
     proc pick(self: TerminalEmu, x = GetMouseX(), y = GetMouseY()): auto =
         (x div cell.x.int, y div cell.y.int)
@@ -282,7 +284,7 @@ when not defined(DirViewer):
         else: path
 
     proc selected_entries(self: DirViewer): seq[DirEntry] =
-        for idx, entry in list: (if entry.selected: result.add entry)
+        result = list.filterIt it.selected
         if result.len == 0: result.add self.hentry
 
     proc selected_indexes(self: DirViewer): seq[int] =
@@ -645,8 +647,8 @@ when not defined(FileViewer):
     const dl_cap = ['\0', '\n']
 
     # --Properties:
-    template hcap(self: FileViewer): int        = self.host.hlines * (self.fullscreen.int+1) - 2
-    template vcap(self: FileViewer): int        = self.host.vlines-2
+    template hcap(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int) - 2
+    template vcap(self: FileViewer): int        = self.host.vlines - 2 * (2 - self.fullscreen.int)
     template screencap(self: FileViewer): int   = self.hcap * self.vcap
 
     iterator render_list(self: FileViewer): tuple[index: int, val: string] =
@@ -670,17 +672,18 @@ when not defined(FileViewer):
         src  = path.absolutePath
 
     proc read_data_line(self: FileViewer): DataLine =
-        let origin = feed.getPosition
-        var buffer: seq[char]
-        while not feed.atEnd:
-            let chr = feed.readChar
-            buffer.add chr
-            if chr in dl_cap: break
-        return (origin, buffer)
+        if not feed.isNil: # Is reading is possible:
+            let origin = feed.getPosition
+            var buffer: seq[char]
+            while not feed.atEnd:
+                let chr = feed.readChar
+                buffer.add chr
+                if chr in dl_cap: break
+            return (origin, buffer)
 
     method update(self: FileViewer): Area {.discardable.} =
         while cache.len < y + self.vcap:
-            cache.add read_data_line()
+           cache.add read_data_line()
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -688,9 +691,11 @@ when not defined(FileViewer):
         host.margin = xoffset
         host.loc(xoffset, 0)
         # Rendering loop.
-        host.write ["╔", "═".repeat(self.hcap), "╗"], border_color, DARKBLUE
+        host.write ["╔", "═".repeat(self.hcap), "╗\n"], border_color, DARKBLUE.Fade(0.7)
         for idx, line in render_list():
-            host.write ["║", line.fit(self.hcap), "║"]
+            host.write "║"
+            host.write line.fit_left(self.hcap), RayWhite, raw=true
+            host.write "║\n", border_color
         host.write ["╚", "═".repeat(self.hcap), "╝"]
         # Finalization.
         return self
@@ -907,6 +912,7 @@ when not defined(MultiViewer):
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
                 # Viewer update.
                 self.active.update()
+                if fviewer != nil: fviewer.update()
                 if dirty:
                     dirty = false
                     for viewer in viewers: viewer.refresh()
@@ -920,7 +926,9 @@ when not defined(MultiViewer):
 
     method render(self: MultiViewer): Area {.discardable.} =
         # Commandlione/viewers render.
-        if not cmdline.exclusive: (for view in viewers: view.render())
+        if not cmdline.exclusive:
+            let displaced = if self.previewing: self.next_viewer() else: nil
+            for view in viewers: (if view == displaced: fviewer else: view).render()
         cmdline.render()
         if cmdline.exclusive: return
         # Hints.
