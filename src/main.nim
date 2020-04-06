@@ -71,7 +71,7 @@ when not defined(Meta):
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
-        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.05",
+        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.06",
         "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
         "===================================================================================",
         "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
@@ -166,7 +166,7 @@ when not defined(TerminalEmu):
         SetWindowSize hlines * cell.x.int, vlines * cell.y.int
 
     proc adjust(self: TerminalEmu) =
-        resize min_width, max(self.vlines, min_height)
+        resize max(self.hlines - self.hlines %% 2, min_width), max(self.vlines, min_height)
 
     proc update(self: TerminalEmu, areas: varargs[Area]) =
         # Common controls.
@@ -547,7 +547,6 @@ when not defined(CommandLine):
         # Commandline.
         host.margin = 0
         host.write "\n"
-        host.margin = -2
         if prompt != "": host.write [prompt, "\a\x06"], BLACK, ORANGE
         else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
         let prefix_len = host.hpos() + 2 # 2 - for additonal symbol and pointer.
@@ -1018,6 +1017,7 @@ when not defined(MultiViewer):
             host.write &">>{error.msg.fit(host.hlines+1)}", BLACK, MAROON
         else: # Hot keys.
             var idx: int
+            host.loc((host.hlines - hint_width * 10 - (prefix.runeLen+1)*11) div 2, host.vpos)
             for hint in "Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit".split("|"):
                 idx.inc()
                 host.write [prefix, $idx], 
