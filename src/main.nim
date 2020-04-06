@@ -782,6 +782,7 @@ when not defined(MultiViewer):
         inspector: FileViewer
         watcher: ProgressWatch
         current, f_key: int
+    const hint_width  = 6
 
     # --Properties:
     template active(self: MultiViewer): DirViewer       = self.viewers[self.current]
@@ -790,6 +791,9 @@ when not defined(MultiViewer):
     template next_path(self: MultiViewer): string       = self.next_viewer.path
     template inspecting(self: MultiViewer): bool        = not inspector.isNil
     template previewing(self: MultiViewer): bool        = self.inspecting and not self.inspector.fullscreen
+    template hint_prefix(self: MultiViewer): string     = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
+    template hint_cellwidth(self: MultiViewer): int     = hint_width + self.hint_prefix.runeLen + 1
+    template hint_margin(self: MultiViewer): int        = (host.hlines - (self.hint_cellwidth.float * 10.5).int) div 2
 
     # --Methods goes here:
     proc select(self: MultiViewer, idx: int = 0) =
@@ -958,7 +962,7 @@ when not defined(MultiViewer):
                 if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown: # DirViewers picking.
                     if picked_view_idx >= 0: select picked_view_idx
                 elif y == host.vlines-1 and MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking.
-                    let index = (x-1) / 11 + 1
+                    let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
                     if index-index.int.float < 0.7: f_key = index.int # If click in button bounds - activating.
                 # Drag/drop handling.
                 let droplist = check_droplist()                
@@ -1010,17 +1014,14 @@ when not defined(MultiViewer):
         cmdline.render()
         if cmdline.exclusive: return
         # Hints.
-        let 
-            hint_width  = 6
-            prefix      = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
         if error.msg != "": # Error message.
             host.write &">>{error.msg.fit(host.hlines+1)}", BLACK, MAROON
         else: # Hot keys.
             var idx: int
-            host.loc((host.hlines - hint_width * 10 - (prefix.runeLen+1)*11) div 2, host.vpos)
+            host.loc(self.hint_margin, host.vpos)
             for hint in "Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit".split("|"):
                 idx.inc()
-                host.write [prefix, $idx], 
+                host.write [self.hint_prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
                 host.write hint.center(hint_width), BLACK, 
                     if idx==3 and self.previewing: Magenta elif idx in [1, 3, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
