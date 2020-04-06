@@ -670,7 +670,7 @@ when not defined(FileViewer):
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
         for idx, data in fragment: 
-            yield (idx, data.chars.join "")
+            yield (idx, data.chars[0..<min(self.hcap, data.chars.len)].join "")
 
     # --Methods goes here:
     proc close(self: FileViewer) =
@@ -721,10 +721,12 @@ when not defined(FileViewer):
             host.write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             host.write rborder, border_color
         # Footing render.
-        let feedname = src.extractFilename
+        let 
+            feedname = src.extractFilename
+            tag      = if feedname.runeLen>self.hcap-2: &"…{feedname.runeSubStr(-self.hcap+4)}" else: feedname
         host.write ["╘", "═".repeat(self.hcap), "╛"]
-        host.loc((self.width - feedname.runeLen) div 2 + xoffset, host.vpos())
-        host.write [" ", feedname, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
+        host.loc((self.hcap - tag.runeLen) div 2 + xoffset, host.vpos())
+        host.write [" ", tag, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
         # Finalization.
         return self
 
