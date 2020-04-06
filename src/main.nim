@@ -25,7 +25,7 @@ when not defined(Meta):
     template shift_down(): bool     = KEY_Left_Shift.IsKeyDown()    or KEY_Right_Shift.IsKeyDown()
     template undot(ext: string): string                            = ext.runeSubstr((" " & ext).searchExtPos)
     template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
-    template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0, size
+    template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0,size
 
     proc root_dir(path: string): string =
         var child = path
@@ -395,7 +395,7 @@ when not defined(DirViewer):
         elif MOUSE_Left_Button.IsMouseButtonReleased:  # Invoke item by double left click.
             if (getTime()-clicker).inMilliseconds<=300: clicker = Time(); (if pickline == self.hindex: invoke hentry())
             else: clicker = getTime()
-        elif MOUSE_Right_Button.IsMouseButtonReleased: (if pickindex < list.len: switch_selection pickindex) # RB=select
+        elif MOUSE_Right_Button.IsMouseButtonReleased: (if pickindex < list.len: switch_selection pickindex)# RB=select
         elif MOUSE_Left_Button.IsMouseButtonDown:      # HL items if left button down.
             if pickindex != self.hline and pickindex < list.len: scroll_to pickindex
         # Kbd controls.
@@ -665,6 +665,10 @@ when not defined(FileViewer):
     template vcap(self: FileViewer): int        = self.host.vlines - border_shift * (2 - self.fullscreen.int)
     template screencap(self: FileViewer): int   = self.hcap * self.vcap
     template feed_avail(self: FileViewer): bool = not feed.isNil
+    template name(self: FileViewer): string     = self.src.extractFilename
+
+    proc name_limited(self: FileViewer): string =
+        if self.name.runeLen > self.hcap-2: &"…{self.name.runeSubStr(-self.hcap+4)}" else: self.name
 
     iterator render_list(self: FileViewer): tuple[index: int, val: string] =
         var fragment = cache[y..^1]
@@ -711,22 +715,19 @@ when not defined(FileViewer):
         # Init setup.
         host.margin = xoffset
         host.loc(xoffset, 0)
-        # Rendering loop.
         host.write ["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade(0.7)
         let 
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
+        # Rendering loop.
         for idx, line in render_list():
             host.write lborder
             host.write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             host.write rborder, border_color
         # Footing render.
-        let 
-            feedname = src.extractFilename
-            tag      = if feedname.runeLen>self.hcap-2: &"…{feedname.runeSubStr(-self.hcap+4)}" else: feedname
         host.write ["╘", "═".repeat(self.hcap), "╛"]
-        host.loc((self.hcap - tag.runeLen) div 2 + xoffset, host.vpos())
-        host.write [" ", tag, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
+        host.loc((self.hcap - self.name_limited.runeLen) div 2 + xoffset, host.vpos())
+        host.write [" ", self.name_limited, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
         # Finalization.
         return self
 
@@ -827,9 +828,9 @@ when not defined(MultiViewer):
         let 
             target = self.active.hentry
             path = self.active.path / self.active.hentry.name
-        if target.is_dir: self.next_viewer.chdir path           # Viewing directory.
-        elif inspector.isNil: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer.
-        else: inspector.open path                                 # Reusing existing fileviewer.
+        if target.is_dir: self.next_viewer.chdir path             # Viewing directory.
+        elif inspector.isNil: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer
+        else: inspector.open path                                 # Reusing existing fileviewer
 
     proc copy(self: MultiViewer) =
         sel_transfer(self, copyDir, copyFile)
@@ -888,7 +889,7 @@ when not defined(MultiViewer):
             if entry.name.wildcard_match(mask): self.active.switch_selection(idx, new_state.int)
 
     proc request_navigation(self: MultiViewer) =
-        cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path: string) => self.navigate path
+        cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path:string) => self.navigate path
 
     proc request_moving(self: MultiViewer) =
         if self.active.selection_valid:
@@ -902,7 +903,7 @@ when not defined(MultiViewer):
             warn(&"Are you sure want to delete {self.active.selected_entries.len} entris") >= 1: delete()
 
     proc request_sel_management(self: MultiViewer, new_state = true) =
-        cmdline.request "Input " & (if new_state: "" else: "un") & "selection pattern \a\x03<*.*>", (pattern: string) =>
+        cmdline.request "Input " & (if new_state: "" else: "un") & "selection pattern \a\x03<*.*>", (pattern:string) =>
             self.manage_selection(pattern, new_state)
 
     proc pick_viewer(self: MultiViewer, x = GetMouseX(), y = GetMouseY()): int =
@@ -933,7 +934,7 @@ when not defined(MultiViewer):
                         receive droplist
                     elif y == host.vlines - service_height: cmdline.paste(droplist[0])
                 # Keyboard controls.
-                if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help: cmdline.record(hint))
+                if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help:cmdline.record(hint))
                 elif f_key==3 or KEY_F3.IsKeyPressed:   switch_inspector()
                 elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
                 elif f_key==6 or KEY_F6.IsKeyPressed:   request_moving()
