@@ -657,11 +657,12 @@ when not defined(FileViewer):
         x, y, xoffset: int
     const 
         dl_cap = ['\n']
-        border_width = 2
+        border_shift = 2
 
     # --Properties:
-    template hcap(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int) - border_width
-    template vcap(self: FileViewer): int        = self.host.vlines - border_width * (2 - self.fullscreen.int)
+    template width(self: FileViewer): int       = self.host.hlines div (2 - self.fullscreen.int)
+    template hcap(self: FileViewer): int        = self.width - border_shift
+    template vcap(self: FileViewer): int        = self.host.vlines - border_shift * (2 - self.fullscreen.int)
     template screencap(self: FileViewer): int   = self.hcap * self.vcap
     template feed_avail(self: FileViewer): bool = not feed.isNil
 
@@ -714,15 +715,16 @@ when not defined(FileViewer):
         host.write ["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade(0.7)
         let 
             lborder = if xoffset > 0: "┤" else: "│"
-            rborder = (if xoffset < host.hlines - self.hcap - border_width: "├" else: "│") & "\n"
+            rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
         for idx, line in render_list():
             host.write lborder
             host.write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             host.write rborder, border_color
         # Footing render.
+        let feedname = src.extractFilename
         host.write ["╘", "═".repeat(self.hcap), "╛"]
-        host.loc((self.hcap - self.src.runeLen) div 2 + xoffset, host.vpos())
-        host.write [" ", self.src.extractFilename, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
+        host.loc((self.width - feedname.runeLen) div 2 + xoffset, host.vpos())
+        host.write [" ", feedname, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
         # Finalization.
         return self
 
