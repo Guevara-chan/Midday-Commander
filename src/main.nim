@@ -602,8 +602,8 @@ when not defined(Alert):
 when not defined(ProgressWatch):
     type ProgressWatch = ref object of Area
         host:  TerminalEmu
-        cancelled: bool
-        start, lastframe: Time
+        start: Time
+        cancelled, frameskip: bool
     const cancel_hint = " ESC to cancel │"
 
     # --Properties:
@@ -623,7 +623,7 @@ when not defined(ProgressWatch):
     method render(self: ProgressWatch): Area {.discardable.} =
         # Init setup.
         parent.render()
-        if (getTime() - last_frame).inSeconds > 0: last_frame = getTime(); return self else: last_frame = getTime()
+        if frameskip: frameskip = false; return self
         if self.elapsed.inMilliseconds < 100: return self
         # Timeline render.
         let midline = host.vlines div 2 - 1
@@ -637,7 +637,8 @@ when not defined(ProgressWatch):
                     else: ("", "│", DarkGray)
             host.loc(host.hlines div 2 - 4 - decor.runeLen, y)
             host.write decor, color, DarkBlue
-            host.write [border, &"{time.hours:02}:{time.minutes:02}:{time.seconds:02}", border.reversed], color, Black
+            host.write [border, &"{time.inHours:02}:{time.inMinutes:02}:{time.inSeconds:02}", border.reversed], 
+                color, Black
             host.write decor.reversed, color, DarkBlue
         # Finalzation.
         host.loc(-(self.elapsed.inSeconds.int %% cancel_hint.runeLen), host.vlines - 1)
@@ -780,6 +781,7 @@ when not defined(MultiViewer):
         if not error.isNil: raise error
 
     proc warn(self: MultiViewer, message: string): int =
+        if not watcher.isNil: watcher.frameskip = true
         return newAlert(host, self, message).answer
 
     proc navigate(self: MultiViewer, path: string) =
