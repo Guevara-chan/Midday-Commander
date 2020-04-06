@@ -933,6 +933,7 @@ when not defined(MultiViewer):
             let displaced = if self.previewing: self.next_viewer() else: nil
             for view in viewers: (if view == displaced: fviewer else: view).render()
         cmdline.render()
+        let prefix = " ".repeat(host.hlines div 30) & "F"
         if cmdline.exclusive: return
         # Hints.
         if error.msg != "": # Error message.
@@ -941,9 +942,9 @@ when not defined(MultiViewer):
             var idx: int
             for hint in "Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit".split("|"):
                 idx.inc()
-                host.write ["   F", $idx], 
+                host.write [prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
-                host.write hint.center(6), BLACK, if idx in [1, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
+                host.write hint.center(6), BLACK, if idx in [1, 3, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
         # Finalization.
         return self
 
