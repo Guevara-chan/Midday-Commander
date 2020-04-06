@@ -76,11 +76,13 @@ when not defined(Meta):
         "===================================================================================",
         "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
         "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
+        "\a\x02F3:\a\x01     switch preview mode on/off",
         "\a\x02F5:\a\x01     copy selected entri(s)",
         "\a\x02F6:\a\x01     request moving selected entri(s) with optional renaming",
         "\a\x02F7:\a\x01     request directory creation",
         "\a\x02F8:\a\x01     delete selected entri(s)",
         "\a\x02F10:\a\x01    quit program",
+        "\a\x02F11:\a\x01    switch debug info on/off",
         "\a\x02Space:\a\x01  confirm alert choice",
         "\a\x02Insert:\a\x01 (un)select hilited entry",
         "\a\x02Home:\a\x01   request new path to browse",
@@ -107,6 +109,8 @@ when not defined(TerminalEmu):
         palette:    seq[Color]
         margin:     int
         dbginfo:    bool
+        title:      string
+        fps_table:  seq[int]
 
     # --Properties.
     template hlines(self: TerminalEmu): int = GetScreenWidth() div self.cell.x.int
@@ -165,20 +169,26 @@ when not defined(TerminalEmu):
         resize self.hlines, self.vlines
 
     proc update(self: TerminalEmu, areas: varargs[Area]) =
+        # Common controls.
         if IsWindowResized(): self.adjust()
+        if KEY_F11.IsKeyPressed: dbginfo = not dbginfo
+        # Render cycle.
         loc_precise(); (fg, bg) = (WHITE, BLACK); margin = 0
         BeginDrawing()
         ClearBackground BLACK
         for area in areas: area.update().render()
-        if dbginfo: DrawFPS(0,0)
         EndDrawing()
+        # Finalization.
+        fps_table.add GetFPS()
+        while fps_table.len > 60: fps_table.delete 0
+        SetWindowTitle(if dbginfo: &"{self.title} [fps: {min(fps_table)}~{max(fps_table)}]" else: title)
 
     proc loop_with(self: TerminalEmu, areas: varargs[Area]) = 
         while not WindowShouldClose(): update areas
 
-    proc newTerminalEmu(colors: varargs[Color]): TerminalEmu =
+    proc newTerminalEmu(title, icon: string; colors: varargs[Color]): TerminalEmu =
         # Init setup.
-        InitWindow(880, 400, "Midday Commander")
+        InitWindow(880, 400, title)
         60.SetTargetFPS
         0.SetExitKey
         getAppDir().setCurrentDir
@@ -191,7 +201,7 @@ when not defined(TerminalEmu):
             ClearBackground DARKBLUE
             DrawText(text, (GetScreenWidth()-sizing.x.int) div 2, (GetScreenHeight()-sizing.y.int) div 2, 25, RAYWHITE)
             EndDrawing()
-        SetWindowIcon(LoadImage("res/midday.png"))
+        SetWindowIcon(LoadImage(icon))
         # Font setup.
         var glyphs: array[486, int]
         for i in 0..glyphs.high: glyphs[i] = i
@@ -204,6 +214,7 @@ when not defined(TerminalEmu):
         # Terminal object.
         result = TerminalEmu(font:"res/TerminalVector.ttf".LoadFontEx(12,glyphs.addr,glyphs.len), palette:colors.toSeq)
         result.cell = result.font.MeasureTextEx("0", result.font.baseSize.float32, 0)
+        result.title = title
         # Finalization.
         result.resize(110, 33) # Most tested size.
 # -------------------- #
@@ -786,6 +797,7 @@ when not defined(MultiViewer):
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
         reset_watcher()
+        uninspect()
         # Deffered finalization.
         defer:
             if self.next_viewer.dirty: # Only if any changes happened.
@@ -981,6 +993,7 @@ when not defined(MultiViewer):
 # ==Main code==
 when isMainModule:
     let 
-        win = newTerminalEmu(BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON)
+        win = newTerminalEmu("Midday Commander", "res/midday.png",
+            BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win, viewer_width))
     win.loop_with supervisor
