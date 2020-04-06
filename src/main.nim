@@ -107,10 +107,10 @@ when not defined(TerminalEmu):
         cur, cell:  Vector2
         fg, bg:     Color
         palette:    seq[Color]
-        margin:     int
         dbginfo:    bool
         title:      string
         fps_table:  seq[int]
+        margin, min_width, min_height: int
 
     # --Properties.
     template hlines(self: TerminalEmu): int = GetScreenWidth() div self.cell.x.int
@@ -166,7 +166,7 @@ when not defined(TerminalEmu):
         SetWindowSize hlines * cell.x.int, vlines * cell.y.int
 
     proc adjust(self: TerminalEmu) =
-        resize self.hlines, self.vlines
+        resize min_width, max(self.vlines, min_height)
 
     proc update(self: TerminalEmu, areas: varargs[Area]) =
         # Common controls.
@@ -186,8 +186,9 @@ when not defined(TerminalEmu):
     proc loop_with(self: TerminalEmu, areas: varargs[Area]) = 
         while not WindowShouldClose(): update areas
 
-    proc newTerminalEmu(title, icon: string; colors: varargs[Color]): TerminalEmu =
+    proc newTerminalEmu(title, icon: string; min_width, min_height: int; colors: varargs[Color]): TerminalEmu =
         # Init setup.
+        FLAG_WINDOW_RESIZABLE.uint32.SetConfigFlags
         InitWindow(880, 400, title)
         60.SetTargetFPS
         0.SetExitKey
@@ -213,8 +214,8 @@ when not defined(TerminalEmu):
         glyphs[0x80..0x80+extra_chars.len-1] = extra_chars
         # Terminal object.
         result = TerminalEmu(font:"res/TerminalVector.ttf".LoadFontEx(12,glyphs.addr,glyphs.len), palette:colors.toSeq)
-        result.cell = result.font.MeasureTextEx("0", result.font.baseSize.float32, 0)
-        result.title = title
+        result.cell  = result.font.MeasureTextEx("0", result.font.baseSize.float32, 0)
+        (result.title, result.min_width, result.min_height) = (title, min_width, min_height)
         # Finalization.
         result.resize(110, 33) # Most tested size.
 # -------------------- #
@@ -268,8 +269,8 @@ when not defined(DirViewer):
         path: string
         list: seq[DirEntry]
         dir_stat, sel_stat: BreakDown
-        hline, origin, xoffset, file_count: int
         dirty, active, visible, hl_changed: bool
+        hline, origin, xoffset, file_count, name_col, size_col, date_col, total_width, viewer_width: int
     const
         hdr_height      = 2
         foot_height     = 3
@@ -278,11 +279,6 @@ when not defined(DirViewer):
         tips_color      = GOLD
         hl_color        = SKYBLUE
         selected_color  = YELLOW
-        name_col        = 28
-        size_col        = "\xB7\x10UP--DIR\x11\xB7".len
-        date_col        = "Modify time:".len
-        total_width     = name_col + size_col + date_col + 2
-        viewer_width    = total_width + 2
 
     # --Properties
     template capacity(self: DirViewer): int     = host.vlines - hdr_height - foot_height - service_height
@@ -381,9 +377,16 @@ when not defined(DirViewer):
                 entry.memo = result
                 list[idx] = entry
 
+    proc adjust(self: DirViewer) =
+        size_col     = "\xB7\x10UP--DIR\x11\xB7".len
+        date_col     = "Modify time:".len
+        name_col     = host.hlines div 2 - size_col - date_col - 4
+        total_width  = name_col + size_col + date_col + 2
+        viewer_width = total_width + 2
+
     method update(self: DirViewer): Area {.discardable.} =
         # Init setup.
-        hl_changed = false
+        hl_changed   = false
         # Mouse controls.
         if not active: return self
         scroll -GetMouseWheelMove()
@@ -413,9 +416,10 @@ when not defined(DirViewer):
 
     method render(self: DirViewer): Area {.discardable.} =
         # Init setup.
-        if not visible: return self        
+        if not visible: return self
         host.margin = xoffset
         host.loc(xoffset, 0)
+        adjust()
         # Header rendering.
         host.write ["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
         host.loc((total_width - self.path_limited.runeLen) div 2 + xoffset, host.vpos())
@@ -454,8 +458,8 @@ when not defined(DirViewer):
         # Finalization.
         return self
 
-    proc newDirViewer(term: TerminalEmu, xoffset = 0): DirViewer =
-        DirViewer(host: term, xoffset: xoffset, visible: true).chdir(getAppFilename().root_dir)
+    proc newDirViewer(term: TerminalEmu): DirViewer =
+        DirViewer(host: term, visible: true).chdir(getAppFilename().root_dir)
 # -------------------- #
 when not defined(CommandLine):
     type CommandLine = ref object of Area
@@ -940,7 +944,7 @@ when not defined(MultiViewer):
     proc pick_viewer(self: MultiViewer, x = GetMouseX(), y = GetMouseY()): int =
         if y < host.vlines - service_height:
             for idx, view in viewers: 
-                if x >= view.xoffset and x <= view.xoffset+viewer_width: return idx
+                if x >= view.xoffset and x <= view.xoffset+self.active.viewer_width: return idx
         return -1
 
     method update(self: MultiViewer): Area {.discardable.} =
@@ -996,16 +1000,20 @@ when not defined(MultiViewer):
         return self
 
     method render(self: MultiViewer): Area {.discardable.} =
-        # Commandlione/viewers render.
+        # Commandline/viewers render.
         if not cmdline.exclusive:
             let displaced = if self.previewing: self.next_viewer() else: nil
-            for view in viewers: (if view == displaced: inspector else: view).render()
+            var offset = 0
+            for view in viewers: 
+                view.xoffset = offset # Offset lineup.
+                (if view == displaced: inspector else: view).render()
+                offset += view.viewer_width # Caluclating next post after adjustment.
         cmdline.render()
+        if cmdline.exclusive: return
+        # Hints.
         let 
             hint_width  = 6
             prefix      = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
-        if cmdline.exclusive: return
-        # Hints.
         if error.msg != "": # Error message.
             host.write &">>{error.msg.fit(host.hlines+1)}", BLACK, MAROON
         else: # Hot keys.
@@ -1029,7 +1037,7 @@ when not defined(MultiViewer):
 # ==Main code==
 when isMainModule:
     let 
-        win = newTerminalEmu("Midday Commander", "res/midday.png",
+        win = newTerminalEmu("Midday Commander", "res/midday.png", 110, 33,
             BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON)
-        supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win, viewer_width))
+        supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win))
     win.loop_with supervisor
