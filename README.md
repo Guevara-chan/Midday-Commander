@@ -14,4 +14,4 @@ Compilation can be achieved through automated build script provided as `release.
 * OpenGL-powered pseudographics in classical 16-colors palette.
 
 # •Brief sampling of retrofuture management•
-![Main](https://user-images.githubusercontent.com/8768470/77628331-f5364080-6f58-11ea-9246-fbc60f786cc5.png)
+![Main](https://user-images.githubusercontent.com/8768470/78603275-83b39780-7860-11ea-839c-12694ec222ca.png)
