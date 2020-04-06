@@ -910,9 +910,12 @@ when not defined(MultiViewer):
                 elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
+                # File viewer update.
+                if fviewer != nil: 
+                    if self.active.hl_changed and not self.active.hentry.is_dir: inspect()
+                    fviewer.update()
                 # Viewer update.
                 self.active.update()
-                if fviewer != nil: fviewer.update()
                 if dirty:
                     dirty = false
                     for viewer in viewers: viewer.refresh()
