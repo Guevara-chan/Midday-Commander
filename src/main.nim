@@ -1,6 +1,6 @@
-import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, threadpool
+import os,osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers 
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import browsers, raylib
+import threadpool, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -679,6 +679,34 @@ when not defined(FileViewer):
             yield (idx, data.chars[0..<min(self.hcap, data.chars.len)].join "")
 
     # --Methods goes here:
+    proc dir_checkout(self: FileViewer, path: string): string =
+        # Init setup.
+        var 
+            subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
+            ext_table: CountTable[string]
+        # Analyzing loop.
+        for record in walkDir(path): 
+            if record.path.dirExists: # Subdir registration.
+                subdirs.inc
+                if record.path.isHidden: hidden_dirs.inc
+            else:                     # File registration.
+                files.inc; surf_size += record.path.getFileSize
+                if record.path.isHidden: hidden_files.inc
+                ext_table.inc(record.path.splitFile.ext)
+        # Extensions breakdown.
+        ext_table["<nil>"] = ext_table[""]
+        ext_table.del("")
+        ext_table.sort()
+        let ext_sum = collect(newSeq): 
+            for key,val in ext_table.pairs: (&"{key}: {val}").align_left(13,' '.Rune) & &"({(val/files.int*100):.2f}%)"
+        # Finalization.
+        result = [&"Sum:: {path}|", "=".repeat(path.runeLen + 6) & "/", "", 
+            &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
+            &"Sub-directories: {($subdirs).insertSep(' ', 3)} ({($hidden_dirs).insertSep(' ', 3)} hidden)",
+            &"Files: {($files).insertSep(' ', 3)} ({($hidden_files).insertSep(' ', 3)} hidden)", ".".repeat(22),
+            ext_sum.join("\n")
+        ].join("\n")
+
     proc close(self: FileViewer) =
         if self.feed_avail:
             feed.close()
@@ -690,8 +718,8 @@ when not defined(FileViewer):
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
             close()
-            feed = path.newFileStream fmRead
-        src = path.absolutePath
+            feed = if path.dirExists: dir_checkout(path).newStringStream() else: path.newFileStream fmRead
+        src = path#.absolutePath
 
     proc read_data_line(self: FileViewer): DataLine =
         if self.feed_avail: # If reading is possible:
@@ -832,8 +860,7 @@ when not defined(MultiViewer):
         let 
             target = self.active.hentry
             path = self.active.path / self.active.hentry.name
-        if target.is_dir: self.next_viewer.chdir path # Viewing directory.
-        elif self.inspecting: inspector.open path                             # Reusing existing fileviewer
+        if self.inspecting: inspector.open path                               # Reusing existing fileviewer
         else: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer
 
     proc copy(self: MultiViewer) =
@@ -953,7 +980,7 @@ when not defined(MultiViewer):
                 # File viewer update.
                 if self.previewing:
                     inspector.xoffset = self.next_viewer.xoffset
-                    if self.active.hl_changed and not self.active.hentry.is_dir: inspect()
+                    if self.active.hl_changed: inspect()
                 if self.inspecting: inspector.update()
                 # Viewer update.
                 self.active.update()
