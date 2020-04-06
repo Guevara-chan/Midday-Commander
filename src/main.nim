@@ -963,7 +963,8 @@ when not defined(MultiViewer):
                     if picked_view_idx >= 0: select picked_view_idx
                 elif y == host.vlines-1 and MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking.
                     let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
-                    if index-index.int.float < 0.7: f_key = index.int # If click in button bounds - activating.
+                    if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): 
+                        f_key = index.int # If click in button bounds - activating.
                 # Drag/drop handling.
                 let droplist = check_droplist()                
                 if droplist.len > 0:
