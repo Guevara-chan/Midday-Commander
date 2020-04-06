@@ -602,8 +602,8 @@ when not defined(Alert):
 when not defined(ProgressWatch):
     type ProgressWatch = ref object of Area
         host:  TerminalEmu
-        start: Time
         cancelled: bool
+        start, lastframe: Time
     const cancel_hint = " ESC to cancel │"
 
     # --Properties:
@@ -623,8 +623,9 @@ when not defined(ProgressWatch):
     method render(self: ProgressWatch): Area {.discardable.} =
         # Init setup.
         parent.render()
-        # Timeline render.
+        if (getTime() - last_frame).inSeconds > 0: last_frame = getTime(); return self else: last_frame = getTime()
         if self.elapsed.inMilliseconds < 100: return self
+        # Timeline render.
         let midline = host.vlines div 2 - 1
         for y in 0..host.vlines-2: 
             let 
@@ -678,7 +679,7 @@ when not defined(FileViewer):
 
     # --Methods goes here:
     proc close(self: FileViewer) =
-        if feed != nil:
+        if self.feed_avail:
             feed.close()
             feed = nil
         src = ""
@@ -755,7 +756,8 @@ when not defined(MultiViewer):
     template next_index(self: MultiViewer): int         = (self.current+1) %% self.viewers.len
     template next_viewer(self: MultiViewer): DirViewer  = self.viewers[self.next_index]
     template next_path(self: MultiViewer): string       = self.next_viewer.path
-    template previewing(self: MultiViewer): bool        = self.inspector != nil and not self.inspector.fullscreen
+    template inspecting(self: MultiViewer): bool        = not inspector.isNil
+    template previewing(self: MultiViewer): bool        = self.inspecting and not self.inspector.fullscreen
 
     # --Methods goes here:
     proc select(self: MultiViewer, idx: int = 0) =
@@ -822,15 +824,15 @@ when not defined(MultiViewer):
                 sel_indexes.delete 0
 
     proc uninspect(self: MultiViewer) =
-        inspector = inspector.destroy()
+        if self.inspecting: inspector = inspector.destroy()
 
     proc inspect(self: MultiViewer) =
         let 
             target = self.active.hentry
             path = self.active.path / self.active.hentry.name
-        if target.is_dir: self.next_viewer.chdir path             # Viewing directory.
-        elif inspector.isNil: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer
-        else: inspector.open path                                 # Reusing existing fileviewer
+        if target.is_dir: self.next_viewer.chdir path # Viewing directory.
+        elif self.inspecting: inspector.open path                             # Reusing existing fileviewer
+        else: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer
 
     proc copy(self: MultiViewer) =
         sel_transfer(self, copyDir, copyFile)
@@ -881,7 +883,7 @@ when not defined(MultiViewer):
                 self.active.dirty = true
 
     proc switch_inspector(self: MultiViewer) =
-        if inspector.isNil: inspect() else: uninspect()
+        if self.inspecting: uninspect() else: inspect()
 
     proc manage_selection(self: MultiViewer, pattern = "", new_state = true) =
         let mask = if pattern != "": pattern else: "*.*"
@@ -950,7 +952,7 @@ when not defined(MultiViewer):
                 if self.previewing:
                     inspector.xoffset = self.next_viewer.xoffset
                     if self.active.hl_changed and not self.active.hentry.is_dir: inspect()
-                if inspector != nil: inspector.update()
+                if self.inspecting: inspector.update()
                 # Viewer update.
                 self.active.update()
                 if dirty:
