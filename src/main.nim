@@ -661,6 +661,7 @@ when not defined(FileViewer):
         cache: seq[DataLine]
         fullscreen: bool
         x, y, xoffset: int
+        lense: proc(fv: FileViewer): iterator:string
     const 
         dl_cap = ['\n']
         border_shift = 2
@@ -676,11 +677,9 @@ when not defined(FileViewer):
     proc name_limited(self: FileViewer): string =
         if self.name.runeLen > self.hcap-2: &"…{self.name.runeSubStr(-self.hcap+4)}" else: self.name
 
-    iterator render_list(self: FileViewer): tuple[index: int, val: string] =
-        var fragment = cache[y..^1]
-        fragment.setLen self.vcap
-        for idx, data in fragment: 
-            yield (idx, data.chars[0..<min(self.hcap, data.chars.len)].join "")
+    iterator cached_chars(self: FileViewer, start = 0): char =
+        for line in cache:
+            for chr in line.chars: yield chr
 
     # --Methods goes here:
     proc dir_checkout(self: FileViewer, path: string): string =
@@ -723,7 +722,7 @@ when not defined(FileViewer):
         if force or path != src: 
             close()
             feed = if path.dirExists: dir_checkout(path).newStringStream() else: path.newFileStream fmRead
-        src = path#.absolutePath
+        src = path.absolutePath
 
     proc read_data_line(self: FileViewer): DataLine =
         if self.feed_avail: # If reading is possible:
@@ -733,7 +732,13 @@ when not defined(FileViewer):
                 let chr = feed.readChar
                 buffer.add chr
                 if chr in dl_cap: break
-            return (origin, buffer)            
+            return (origin, buffer)      
+
+    proc ascii_lense(self: FileViewer): iterator:string =
+        var fragment = cache[y..^1]
+        fragment.setLen self.vcap
+        return iterator:string =
+            for data in fragment: yield data.chars[0..<min(self.hcap, data.chars.len)].join ""
 
     method update(self: FileViewer): Area {.discardable.} =
         if self.feed_avail: # Data pumping
@@ -753,7 +758,8 @@ when not defined(FileViewer):
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
         # Rendering loop.
-        for idx, line in render_list(): with host:
+        let render_list = lense(self)
+        for line in lense(self)(): with host:
             write lborder
             write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             write rborder, border_color
@@ -765,7 +771,7 @@ when not defined(FileViewer):
         return self
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
-        result = FileViewer(host: term, xoffset: xoffset)
+        result = FileViewer(host: term, xoffset: xoffset, lense: ascii_lense)
         if src != "": result.open src
 
     proc destroy(self: FileViewer): FileViewer {.discardable.} =
