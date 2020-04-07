@@ -542,9 +542,7 @@ when not defined(CommandLine):
         # Output log.
         if self.exclusive: 
             for line in log[origin..<min(log.len, origin+host.hlines)]: host.write [line, $'\n'], GRAY
-            if fullscreen:
-                host.loc(host.hlines - exit_hint.len, 0)
-                host.write exit_hint, BLACK, DARKGRAY
+            if fullscreen: with host, loc(host.hlines - exit_hint.len, 0), write(exit_hint, BLACK, DARKGRAY)
             return
         # Commandline.
         host.margin = 0
