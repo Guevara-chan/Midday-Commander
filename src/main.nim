@@ -750,16 +750,15 @@ when not defined(FileViewer):
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
         host.margin = xoffset
-        host.loc(xoffset, 0)
-        host.write ["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade(0.7)
+        with host, loc(xoffset, 0), write(["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade 0.7)
         let 
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
         # Rendering loop.
-        for idx, line in render_list():
-            host.write lborder
-            host.write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
-            host.write rborder, border_color
+        for idx, line in render_list(): with host:
+            write lborder
+            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
+            write rborder, border_color
         # Footing render.
         host.write ["╘", "═".repeat(self.hcap), "╛"]
         host.loc((self.hcap - self.name_limited.runeLen) div 2 + xoffset, host.vpos())
