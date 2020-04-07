@@ -542,7 +542,7 @@ when not defined(CommandLine):
         # Output log.
         if self.exclusive: 
             for line in log[origin..<min(log.len, origin+host.hlines)]: host.write [line, $'\n'], GRAY
-            if fullscreen: with host, loc(host.hlines - exit_hint.len, 0), write(exit_hint, BLACK, DARKGRAY)
+            if fullscreen: host.with loc(host.hlines - exit_hint.len, 0), write(exit_hint, BLACK, DARKGRAY)
             return
         # Commandline.
         host.margin = 0
@@ -748,7 +748,7 @@ when not defined(FileViewer):
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
         host.margin = xoffset
-        with host, loc(xoffset, 0), write(["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade 0.7)
+        host.with loc(xoffset, 0), write(["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade 0.7)
         let 
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
