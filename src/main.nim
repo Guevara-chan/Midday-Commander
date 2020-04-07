@@ -1,6 +1,6 @@
-import os,osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers 
+import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, std/with
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import threadpool, raylib
+import browsers, threadpool, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -421,21 +421,23 @@ when not defined(DirViewer):
         host.loc(xoffset, 0)
         adjust()
         # Header rendering.
-        host.write ["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
-        host.loc((total_width - self.path_limited.runeLen) div 2 + xoffset, host.vpos())
-        host.write [" ", self.path_limited, " \n"], (if active: hl_color else: direxit.coloring), DARKGRAY
-        host.write ["║\a\x02", "Name".center(name_col), "\a\x01│\a\x02", "Size".center(size_col), "\a\x01│\a\x02",
-            "Modify time".center(date_col), "\a\x01║\n"], border_color, DARKBLUE
+        with host:
+            write ["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
+            loc((total_width - self.path_limited.runeLen) div 2 + xoffset, host.vpos())
+            write [" ", self.path_limited, " \n"], (if active: hl_color else: direxit.coloring), DARKGRAY
+            write ["║\a\x02", "Name".center(name_col), "\a\x01│\a\x02", "Size".center(size_col), "\a\x01│\a\x02",
+                "Modify time".center(date_col), "\a\x01║\n"], border_color, DARKBLUE
         # List rendering.
         for idx, entry in self.render_list:
             let desc = cache_desc(idx)
             let text_color = if entry.selected: selected_color else: desc.coloring
-            host.write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
-            host.write [desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
-                if active and idx == hline: hl_color else: DARKBLUE # Highlight line.
-            host.write [desc.metrics.fit(size_col), "\a\x01│"], text_color
-            host.write desc.time_stamp.fit_left(date_col), text_color
-            host.write ["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
+            with host:
+                write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
+                write [desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
+                    if active and idx == hline: hl_color else: DARKBLUE # Highlight line.
+                write [desc.metrics.fit(size_col), "\a\x01│"], text_color
+                write desc.time_stamp.fit_left(date_col), text_color
+                write ["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
         # 1st footline rendering.
         host.write ["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
@@ -638,11 +640,12 @@ when not defined(ProgressWatch):
                     elif y == midline-1: ("▄", "│", Lime.Fade(0.5))
                     elif y == midline+1: ("▀", "│", Lime.Fade(0.5))
                     else: ("", "│", DarkGray)
-            host.loc(host.hlines div 2 - 4 - decor.runeLen, y)
-            host.write decor, color, DarkBlue
-            host.write [border, &"{time.inHours:02}:{time.inMinutes:02}:{time.inSeconds:02}", border.reversed], 
-                color, Black
-            host.write decor.reversed, color, DarkBlue
+            with host:
+                loc(host.hlines div 2 - 4 - decor.runeLen, y)
+                write decor, color, DarkBlue
+                write [border, &"{time.inHours:02}:{time.inMinutes:02}:{time.inSeconds:02}", border.reversed], 
+                    color, Black
+                write decor.reversed, color, DarkBlue
         # Finalzation.
         host.loc(-(self.elapsed.inSeconds.int %% cancel_hint.runeLen), host.vlines - 1)
         host.write cancel_hint.repeat(host.hlines div cancel_hint.runeLen + 2), BLACK, SkyBlue
@@ -745,7 +748,7 @@ when not defined(FileViewer):
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
-        # Init setup.
+        # Init setup.        
         host.margin = xoffset
         host.loc(xoffset, 0)
         host.write ["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade(0.7)
