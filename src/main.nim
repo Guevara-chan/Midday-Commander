@@ -653,7 +653,8 @@ when not defined(ProgressWatch):
         ProgressWatch(host: term, parent: creator, start: getTime())
 # -------------------- #
 when not defined(FileViewer):
-    type DataLine = tuple[origin: int, chars: seq[char]]
+    type
+        DataLine = tuple[origin: int, chars: seq[char]]
     type FileViewer = ref object of Area
         host: TerminalEmu
         src:  string
@@ -661,7 +662,8 @@ when not defined(FileViewer):
         cache: seq[DataLine]
         fullscreen: bool
         x, y, xoffset: int
-        lense: proc(fv: FileViewer): iterator:string
+        lense_id: string
+        #lenses: Table[string, proc(fv: FileViewer): iterator:string]
     const 
         dl_cap = ['\n']
         border_shift = 2
@@ -747,37 +749,46 @@ when not defined(FileViewer):
             for data in fragment: yield data.chars[0..<min(self.hcap, data.chars.len)].join ""
 
     proc hex_lense(self: FileViewer): iterator:string =
-        let per_line = self.hcap div 3
+        let per_line = self.hcap div 3 - (self.hcap div 9)
         var 
             accum: seq[string]
+            recap: seq[char]
             lines_left = self.vcap
         return iterator:string =
             for chr in self.cached_chars: 
-                accum.add &" {chr.int32:02X}"
+                accum.add &"{chr.int32:02X}" & (if accum.len %% 5 == 4: "\xB3" else: " ")
+                recap.add chr
                 if accum.len >= per_line:
-                    yield accum.join ""
+                    yield accum.join("") & recap.join ""
                     lines_left.dec
                     if lines_left == 0: return
                     accum.setLen 0
+                    recap.setLen 0
             for exceed in 1..lines_left: yield ""
 
+    const lenses = {"ASCII": ascii_lense, "HEX": hex_lense, "ERROR": noise_lense}.toTable
     method update(self: FileViewer): Area {.discardable.} =
-        lense = if self.feed_avail: # Data pumping.
+        lense_id = if self.feed_avail: # Data pumping.
             while cache.len < y + self.vcap:
                cache.add read_data_line()
-            if '\0' in cache[0].chars: hex_lense else: ascii_lense
-        else: noise_lense # Noise garden
+            if '\0' in cache[0].chars: "HEX" else: "ASCII"
+        else: "ERROR" # Noise garden
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
         host.margin = xoffset
-        host.with loc(xoffset, 0), write(["╒", "═".repeat(self.hcap), "╕\n"], border_color, DARKBLUE.Fade 0.7)
+        # Header render.
+        with host:
+            loc(xoffset, 0)
+            write "╒", border_color, DARKBLUE.Fade 0.7
+            write @[" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
+            write @["═".repeat(self.hcap-lense_id.runeLen-2), "╕\n"], border_color, DARKBLUE.Fade 0.7
         let 
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
         # Rendering loop.
-        let render_list = lense(self)
+        let render_list = lenses[lense_id](self)
         for line in render_list(): with host:
             write lborder
             write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
@@ -791,6 +802,7 @@ when not defined(FileViewer):
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
         result = FileViewer(host: term, xoffset: xoffset)
+        #result.lenses = {"ASCII": ascii_lense, "HEX": hex_lense, "ERROR": noise_lense}.toTable
         if src != "": result.open src
 
     proc destroy(self: FileViewer): FileViewer {.discardable.} =
