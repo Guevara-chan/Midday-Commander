@@ -654,7 +654,7 @@ when not defined(ProgressWatch):
 # -------------------- #
 when not defined(FileViewer):
     type
-        DataLine = tuple[origin: int, chars: seq[char]]
+        DataLine = tuple[origin: int, data: string]
     type FileViewer = ref object of Area
         host: TerminalEmu
         feed: Stream
@@ -680,7 +680,7 @@ when not defined(FileViewer):
 
     iterator cached_chars(self: FileViewer, start = 0): char =
         for line in cache:
-            for chr in line.chars: yield chr
+            for chr in line.data: yield chr
 
     # --Methods goes here:
     proc dir_checkout(self: FileViewer, path: string): string =
@@ -733,7 +733,7 @@ when not defined(FileViewer):
                 let chr = feed.readChar
                 buffer.add chr
                 if chr in dl_cap: break
-            return (origin, buffer)      
+            return (origin, buffer.join "")      
 
     proc noise_lense(self: FileViewer): iterator:string =
         return iterator:string =        
@@ -745,7 +745,7 @@ when not defined(FileViewer):
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
         return iterator:string =
-            for data in fragment: yield data.chars[0..<min(self.hcap, data.chars.len)].join ""
+            for line in fragment: yield line.data.subStr(x)
 
     proc hex_lense(self: FileViewer): iterator:string =
         let per_line = self.hcap div 3 - (self.hcap div 9) + 1
@@ -754,16 +754,17 @@ when not defined(FileViewer):
             recap: seq[char]
             lines_left = self.vcap
         return iterator:string =
+            template row_out() = yield accum.join("") & recap.join ""; lines_left.dec
             for chr in self.cached_chars: 
                 accum.add &"{chr.int32:02X}" & # Smart delimiting.
                     (if accum.len == per_line-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
                 recap.add chr
                 if accum.len >= per_line:
-                    yield accum.join("") & recap.join ""
-                    lines_left.dec
+                    row_out()                    
                     if lines_left == 0: return
                     accum.setLen 0
                     recap.setLen 0
+            if accum.len > 0: row_out()
             for exceed in 1..lines_left: yield ""
 
     proc cycle_lenses(self: FileViewer) =
@@ -774,7 +775,7 @@ when not defined(FileViewer):
             lense_id = if self.feed_avail: # Data pumping.
                 while cache.len < y + self.vcap:
                    cache.add read_data_line()
-                if lense_switch xor '\0' in cache[0].chars: "HEX" else: "ASCII"
+                if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden
         return self
 
