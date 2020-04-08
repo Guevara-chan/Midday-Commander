@@ -766,12 +766,17 @@ when not defined(FileViewer):
                     recap.setLen 0
             for exceed in 1..lines_left: yield ""
 
+    proc cycle_lenses(self: FileViewer) =
+        lense_switch = not lense_switch
+
     method update(self: FileViewer): Area {.discardable.} =
-        lense_id = if self.feed_avail: # Data pumping.
-            while cache.len < y + self.vcap:
-               cache.add read_data_line()
-            if lense_switch or '\0' in cache[0].chars: "HEX" else: "ASCII"
-        else: "ERROR" # Noise garden
+        defer: # Deffered date update.
+            lense_id = if self.feed_avail: # Data pumping.
+                while cache.len < y + self.vcap:
+                   cache.add read_data_line()
+                if lense_switch xor '\0' in cache[0].chars: "HEX" else: "ASCII"
+            else: "ERROR" # Noise garden
+            #echo lense_id
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -984,10 +989,14 @@ when not defined(MultiViewer):
     proc pick_viewer(self: MultiViewer, x = GetMouseX(), y = GetMouseY()): int =
         if y < host.vlines - service_height:
             for idx, view in viewers: 
-                if x >= view.xoffset and x <= view.xoffset+self.active.viewer_width: return idx
+                if x in view.xoffset..view.xoffset+view.viewer_width: return idx
         return -1
 
     method update(self: MultiViewer): Area {.discardable.} =
+        # Aux template.
+        template tag_test(): bool = # Was lense switcher hit ?
+            self.previewing and y == 0 and x in inspector.xoffset+2..inspector.xoffset+3+inspector.lense_id.runeLen
+        # Init Setup.
         f_key = 0 # F-key emulator.
         try:
             cmdline.update()
@@ -997,11 +1006,12 @@ when not defined(MultiViewer):
                     (x, y) = host.pick()
                     picked_view_idx = pick_viewer(x, y)
                 if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown: # DirViewers picking.
-                    if picked_view_idx >= 0: select picked_view_idx
-                elif y == host.vlines-1 and MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking.
-                    let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
-                    if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): 
-                        f_key = index.int # If click in button bounds - activating.
+                    if not tag_test() and picked_view_idx >= 0: select picked_view_idx
+                elif MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking & inspector controls.
+                    if tag_test: inspector.cycle_lenses() # Switch view mode on inspector tag click.
+                    elif y == host.vlines-1: # Hints check for click in button bounds to activate it.
+                        let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
+                        if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): f_key = index.int
                 # Drag/drop handling.
                 let droplist = check_droplist()                
                 if droplist.len > 0:
@@ -1047,7 +1057,7 @@ when not defined(MultiViewer):
             var offset = 0
             for view in viewers: 
                 view.xoffset = offset # Offset lineup.
-                (if view == displaced: inspector else: view).render()
+                (if view == displaced: (view.adjust(); inspector) else: view).render() # Adjusting even if no render.
                 offset += view.viewer_width # Caluclating next post after adjustment.
         cmdline.render()
         if cmdline.exclusive: return
