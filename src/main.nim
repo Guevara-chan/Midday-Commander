@@ -657,12 +657,11 @@ when not defined(FileViewer):
         DataLine = tuple[origin: int, chars: seq[char]]
     type FileViewer = ref object of Area
         host: TerminalEmu
-        src:  string
         feed: Stream
-        cache: seq[DataLine]
-        fullscreen: bool
+        cache: seq[DataLine]        
         x, y, xoffset: int
-        lense_id: string
+        src, lense_id: string
+        fullscreen, lense_switch: bool
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     const 
         dl_cap = ['\n']
@@ -771,7 +770,7 @@ when not defined(FileViewer):
         lense_id = if self.feed_avail: # Data pumping.
             while cache.len < y + self.vcap:
                cache.add read_data_line()
-            if '\0' in cache[0].chars: "HEX" else: "ASCII"
+            if lense_switch or '\0' in cache[0].chars: "HEX" else: "ASCII"
         else: "ERROR" # Noise garden
         return self
 
