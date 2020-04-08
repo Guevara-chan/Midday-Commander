@@ -663,7 +663,7 @@ when not defined(FileViewer):
         fullscreen: bool
         x, y, xoffset: int
         lense_id: string
-        #lenses: Table[string, proc(fv: FileViewer): iterator:string]
+        lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     const 
         dl_cap = ['\n']
         border_shift = 2
@@ -767,7 +767,7 @@ when not defined(FileViewer):
                     recap.setLen 0
             for exceed in 1..lines_left: yield ""
 
-    const lenses = {"ASCII": ascii_lense, "HEX": hex_lense, "ERROR": noise_lense}.toTable
+    #const lenses = {"ASCII": ascii_lense, "HEX": hex_lense, "ERROR": noise_lense}.toTable
     method update(self: FileViewer): Area {.discardable.} =
         lense_id = if self.feed_avail: # Data pumping.
             while cache.len < y + self.vcap:
@@ -803,7 +803,8 @@ when not defined(FileViewer):
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
         result = FileViewer(host: term, xoffset: xoffset)
-        #result.lenses = {"ASCII": ascii_lense, "HEX": hex_lense, "ERROR": noise_lense}.toTable
+        type fix = proc (fv: FileViewer): iterator (): string{.closure.}{.closure.} # Siome compiler glitches.
+        result.lenses = {"ASCII": ascii_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
         if src != "": result.open src
 
     proc destroy(self: FileViewer): FileViewer {.discardable.} =
