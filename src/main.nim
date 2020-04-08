@@ -749,14 +749,15 @@ when not defined(FileViewer):
             for data in fragment: yield data.chars[0..<min(self.hcap, data.chars.len)].join ""
 
     proc hex_lense(self: FileViewer): iterator:string =
-        let per_line = self.hcap div 3 - (self.hcap div 9)
+        let per_line = self.hcap div 3 - (self.hcap div 9) + 1
         var 
             accum: seq[string]
             recap: seq[char]
             lines_left = self.vcap
         return iterator:string =
             for chr in self.cached_chars: 
-                accum.add &"{chr.int32:02X}" & (if accum.len %% 5 == 4: "\xB3" else: " ")
+                accum.add &"{chr.int32:02X}" & # Smart delimiting.
+                    (if accum.len == per_line-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
                 recap.add chr
                 if accum.len >= per_line:
                     yield accum.join("") & recap.join ""
