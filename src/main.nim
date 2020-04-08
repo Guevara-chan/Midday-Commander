@@ -734,6 +734,12 @@ when not defined(FileViewer):
                 if chr in dl_cap: break
             return (origin, buffer)      
 
+    proc noise_lense(self: FileViewer): iterator:string =
+        return iterator:string =        
+            for y in 0..<self.vcap:
+                let noise = collect(newSeq): (for x in 0..<self.hcap: "    01".sample)
+                yield noise.join ""
+
     proc ascii_lense(self: FileViewer): iterator:string =
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
@@ -741,10 +747,10 @@ when not defined(FileViewer):
             for data in fragment: yield data.chars[0..<min(self.hcap, data.chars.len)].join ""
 
     proc hex_lense(self: FileViewer): iterator:string =
-        let per_line = hcap() div 3
+        let per_line = self.hcap div 3
         var 
             accum: seq[string]
-            lines_left = self.vcap()
+            lines_left = self.vcap
         return iterator:string =
             for chr in self.cached_chars: 
                 accum.add &" {chr.int32:02X}"
@@ -756,13 +762,11 @@ when not defined(FileViewer):
             for exceed in 1..lines_left: yield ""
 
     method update(self: FileViewer): Area {.discardable.} =
-        if self.feed_avail: # Data pumping
+        lense = if self.feed_avail: # Data pumping.
             while cache.len < y + self.vcap:
                cache.add read_data_line()
-        else: cache = collect(newSeq): # Noise garden.
-            for y in 0..<self.vcap:
-                let noise = collect(newSeq): (for x in 0..<self.hcap: "    01".sample)
-                (0, noise)                
+            if '\0' in cache[0].chars: hex_lense else: ascii_lense
+        else: noise_lense # Noise garden
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -786,7 +790,7 @@ when not defined(FileViewer):
         return self
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
-        result = FileViewer(host: term, xoffset: xoffset, lense: ascii_lense)
+        result = FileViewer(host: term, xoffset: xoffset)
         if src != "": result.open src
 
     proc destroy(self: FileViewer): FileViewer {.discardable.} =
