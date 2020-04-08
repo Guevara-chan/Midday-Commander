@@ -141,7 +141,7 @@ when not defined(TerminalEmu):
                     buffer = ""
                     chunks.add $chr
             if buffer != "": chunks.add buffer
-        else: chunks = @[txt.replace('\n', ' ')]
+        else: chunks = @[txt.replace('\n', ' ').replace('\0', ' ')]
         # Char render loop.
         for chunk in chunks:
             if ctrl:                                         # Control arg.
@@ -718,6 +718,7 @@ when not defined(FileViewer):
         src = ""
         cache.setLen 0
         (x, y) = (0, 0)
+        lense_switch = false
 
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
@@ -748,13 +749,14 @@ when not defined(FileViewer):
             for line in fragment: yield line.data.subStr(x)
 
     proc hex_lense(self: FileViewer): iterator:string =
-        let per_line = self.hcap div 3 - (self.hcap div 9) + 1
+        const cell = "FF ".len
+        let per_line = self.hcap div cell - (self.hcap div (cell*cell)) + 1
         var 
             accum: seq[string]
             recap: seq[char]
             lines_left = self.vcap
         return iterator:string =
-            template row_out() = yield accum.join("") & recap.join ""; lines_left.dec
+            template row_out(sum = recap.join "") = yield accum.join("") & sum; lines_left.dec
             for chr in self.cached_chars: 
                 accum.add &"{chr.int32:02X}" & # Smart delimiting.
                     (if accum.len == per_line-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
@@ -764,7 +766,7 @@ when not defined(FileViewer):
                     if lines_left == 0: return
                     accum.setLen 0
                     recap.setLen 0
-            if accum.len > 0: row_out()
+            if accum.len > 0: row_out ' '.repeat(per_line*cell-accum.len*cell-1) & "\xBA" & recap.join ""
             for exceed in 1..lines_left: yield ""
 
     proc cycle_lenses(self: FileViewer) =
