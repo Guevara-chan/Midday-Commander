@@ -141,7 +141,7 @@ when not defined(TerminalEmu):
                     buffer = ""
                     chunks.add $chr
             if buffer != "": chunks.add buffer
-        else: chunks = @[txt]
+        else: chunks = @[txt.replace('\n', ' ')]
         # Char render loop.
         for chunk in chunks:
             if ctrl:                                         # Control arg.
@@ -776,7 +776,6 @@ when not defined(FileViewer):
                    cache.add read_data_line()
                 if lense_switch xor '\0' in cache[0].chars: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden
-            #echo lense_id
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -1063,7 +1062,7 @@ when not defined(MultiViewer):
         if cmdline.exclusive: return
         # Hints.
         if error.msg != "": # Error message.
-            host.write &">>{error.msg.fit(host.hlines+1)}", BLACK, MAROON
+            host.write error.msg.fit(host.hlines+1), BLACK, MAROON
         else: # Hot keys.
             var idx: int
             host.loc(self.hint_margin, host.vpos)
