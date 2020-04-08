@@ -740,6 +740,21 @@ when not defined(FileViewer):
         return iterator:string =
             for data in fragment: yield data.chars[0..<min(self.hcap, data.chars.len)].join ""
 
+    proc hex_lense(self: FileViewer): iterator:string =
+        let per_line = hcap() div 3
+        var 
+            accum: seq[string]
+            lines_left = self.vcap()
+        return iterator:string =
+            for chr in self.cached_chars: 
+                accum.add &" {chr.int32:02X}"
+                if accum.len >= per_line:
+                    yield accum.join ""
+                    lines_left.dec
+                    if lines_left == 0: return
+                    accum.setLen 0
+            for exceed in 1..lines_left: yield ""
+
     method update(self: FileViewer): Area {.discardable.} =
         if self.feed_avail: # Data pumping
             while cache.len < y + self.vcap:
@@ -759,14 +774,14 @@ when not defined(FileViewer):
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
         # Rendering loop.
         let render_list = lense(self)
-        for line in lense(self)(): with host:
+        for line in render_list(): with host:
             write lborder
             write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             write rborder, border_color
         # Footing render.
         host.write ["╘", "═".repeat(self.hcap), "╛"]
         host.loc((self.hcap - self.name_limited.runeLen) div 2 + xoffset, host.vpos())
-        host.write [" ", self.name_limited, " "], (if self.feed_avail: Magenta else: Maroon), DARKGRAY
+        host.write [" ", self.name_limited, " "], (if self.feed_avail: Orange else: Maroon), DARKGRAY
         # Finalization.
         return self
 
@@ -1031,7 +1046,7 @@ when not defined(MultiViewer):
                 host.write [self.hint_prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
                 host.write hint.center(hint_width), BLACK, 
-                    if idx==3 and self.previewing: Magenta elif idx in [1, 3, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
+                    if idx==3 and self.previewing: Orange elif idx in [1, 3, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
         # Finalization.
         return self
 
