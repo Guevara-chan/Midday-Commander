@@ -767,7 +767,6 @@ when not defined(FileViewer):
                     recap.setLen 0
             for exceed in 1..lines_left: yield ""
 
-    #const lenses = {"ASCII": ascii_lense, "HEX": hex_lense, "ERROR": noise_lense}.toTable
     method update(self: FileViewer): Area {.discardable.} =
         lense_id = if self.feed_avail: # Data pumping.
             while cache.len < y + self.vcap:
