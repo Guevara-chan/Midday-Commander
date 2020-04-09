@@ -653,8 +653,7 @@ when not defined(ProgressWatch):
         ProgressWatch(host: term, parent: creator, start: getTime())
 # -------------------- #
 when not defined(FileViewer):
-    type
-        DataLine = tuple[origin: int, data: string]
+    type DataLine = tuple[origin: int, data: string]
     type FileViewer = ref object of Area
         host: TerminalEmu
         feed: Stream
@@ -663,7 +662,9 @@ when not defined(FileViewer):
         src, lense_id: string
         fullscreen, lense_switch: bool
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
-    const 
+    type FVControls = enum
+        none, lense, minmax
+    const
         dl_cap = ['\n']
         border_shift = 2
 
@@ -683,13 +684,19 @@ when not defined(FileViewer):
             for chr in line.data: yield chr
 
     # --Methods goes here:
+    proc picked_control(self: FileViewer): FVControls =
+        let (x, y) = host.pick()
+        if y == 0: # Headerline
+            if x in xoffset+2..xoffset+3+lense_id.runeLen: return FVControls.lense
+        return FVControls.none
+
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
         var 
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
         # Analyzing loop.
-        for record in walkDir(path, checkDir = true): 
+        for record in walkDir(path, checkDir = false): 
             if record.path.dirExists: # Subdir registration.
                 subdirs.inc
                 if record.path.isHidden: hidden_dirs.inc
@@ -735,7 +742,7 @@ when not defined(FileViewer):
                 let chr = feed.readChar
                 buffer.add chr
                 if chr in dl_cap: break
-            return (origin, buffer.join "")      
+            return (origin, buffer.join "")    
 
     proc noise_lense(self: FileViewer): iterator:string =
         return iterator:string =        
@@ -996,10 +1003,6 @@ when not defined(MultiViewer):
         return -1
 
     method update(self: MultiViewer): Area {.discardable.} =
-        # Aux template.
-        template tag_test(): bool = # Was lense switcher hit ?
-            self.previewing and y == 0 and x in inspector.xoffset+2..inspector.xoffset+3+inspector.lense_id.runeLen
-        # Init Setup.
         f_key = 0 # F-key emulator.
         try:
             cmdline.update()
@@ -1008,13 +1011,15 @@ when not defined(MultiViewer):
                 let
                     (x, y) = host.pick()
                     picked_view_idx = pick_viewer(x, y)
+                    fv_pick = if inspector.isNil: FVControls.none else: inspector.picked_control
                 if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown: # DirViewers picking.
-                    if not tag_test() and picked_view_idx >= 0: select picked_view_idx
+                    if fv_pick == FVControls.none and picked_view_idx >= 0: select picked_view_idx
                 elif MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking & inspector controls.
-                    if tag_test: inspector.cycle_lenses() # Switch view mode on inspector tag click.
-                    elif y == host.vlines-1: # Hints check for click in button bounds to activate it.
-                        let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
-                        if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): f_key = index.int
+                    case fv_pick: # FileViewer controls.
+                        of FVControls.lense: inspector.cycle_lenses() # Switch view mode on inspector tag click.
+                        elif y == host.vlines-1: # Hints check for click in button bounds to activate it.
+                            let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
+                            if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): f_key = index.int
                 # Drag/drop handling.
                 let droplist = check_droplist()                
                 if droplist.len > 0:
