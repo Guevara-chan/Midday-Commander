@@ -689,7 +689,7 @@ when not defined(FileViewer):
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
         # Analyzing loop.
-        for record in walkDir(path): 
+        for record in walkDir(path, checkDir = true): 
             if record.path.dirExists: # Subdir registration.
                 subdirs.inc
                 if record.path.isHidden: hidden_dirs.inc
@@ -723,7 +723,8 @@ when not defined(FileViewer):
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
             close()
-            feed = if path.dirExists: dir_checkout(path).newStringStream() else: path.newFileStream fmRead
+            try: feed = if path.dirExists: dir_checkout(path).newStringStream() else: path.newFileStream fmRead
+            except: discard # special case to not use handler to MultiViewer.
         src = path.absolutePath
 
     proc read_data_line(self: FileViewer): DataLine =
