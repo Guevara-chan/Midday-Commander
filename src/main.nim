@@ -209,7 +209,7 @@ when not defined(TerminalEmu):
         let rus_chars = collect(newSeq): (for x in 0x410..0x451: x)
         let extra_chars = @[
             0x2534,0x2551,0x2502,0x255F,0x2500,0x2562,0x2550,0x255A,0x255D,0x2554,0x2557,0x2026,0x2588,0x2192,0x2584,
-                0x2580,0x2524,0x2552,0x2558,0x2555,0x255B,0x251C,0xB7,0xB0,0xA0
+                0x2580,0x2524,0x2552,0x2558,0x2555,0x255B,0x251C,0x2194,0x2561,0x255E,0xB7,0xB0,0xA0
             ] & rus_chars
         glyphs[0x80..0x80+extra_chars.len-1] = extra_chars
         # Terminal object.
@@ -669,15 +669,16 @@ when not defined(FileViewer):
         border_shift = 2
 
     # --Properties:
-    template width(self: FileViewer): int       = self.host.hlines div (2 - self.fullscreen.int)
-    template hcap(self: FileViewer): int        = self.width - border_shift
-    template vcap(self: FileViewer): int        = self.host.vlines - border_shift * (2 - self.fullscreen.int)
-    template screencap(self: FileViewer): int   = self.hcap * self.vcap
-    template feed_avail(self: FileViewer): bool = not feed.isNil
-    template name(self: FileViewer): string     = self.src.extractFilename
+    template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
+    template hcap(self: FileViewer): int         = self.width - border_shift
+    template vcap(self: FileViewer): int         = self.host.vlines - border_shift * (2 - self.fullscreen.int)
+    template screencap(self: FileViewer): int    = self.hcap * self.vcap
+    template margin(self: FileViewer): int       = (if self.fullscreen: 0 else: xoffset)
+    template feed_avail(self: FileViewer): bool  = not feed.isNil
+    template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
 
-    proc name_limited(self: FileViewer): string =
-        if self.name.runeLen > self.hcap-2: &"…{self.name.runeSubStr(-self.hcap+4)}" else: self.name
+    proc caption_limited(self: FileViewer): string =        
+        if self.caption.runeLen > self.hcap-2: &"…{self.caption.runeSubStr(-self.hcap+4)}" else: self.caption
 
     iterator cached_chars(self: FileViewer, start = 0): char =
         for line in cache:
@@ -687,7 +688,8 @@ when not defined(FileViewer):
     proc picked_control(self: FileViewer): FVControls =
         let (x, y) = host.pick()
         if y == 0: # Headerline
-            if x in xoffset+2..xoffset+3+lense_id.runeLen: return FVControls.lense
+            if x in self.margin+2..self.margin+3+lense_id.runeLen:                return FVControls.lense
+            if x in self.margin+self.hcap-"╡↔╞".runeLen+1..self.margin+self.hcap: return FVControls.minmax
         return FVControls.none
 
     proc dir_checkout(self: FileViewer, path: string): string =
@@ -780,6 +782,9 @@ when not defined(FileViewer):
     proc cycle_lenses(self: FileViewer) =
         lense_switch = not lense_switch
 
+    proc switch_fullscreen(self: FileViewer) =
+        fullscreen = not fullscreen
+
     method update(self: FileViewer): Area {.discardable.} =
         defer: # Deffered date update.
             lense_id = if self.feed_avail: # Data pumping.
@@ -791,13 +796,16 @@ when not defined(FileViewer):
 
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
-        host.margin = xoffset
+        host.margin = self.margin
+        let main_bg = DARKBLUE.Fade 0.7
         # Header render.
         with host:
-            loc(xoffset, 0)
-            write "╒", border_color, DARKBLUE.Fade 0.7
+            loc(self.margin, 0)
+            write "╒", border_color, main_bg
             write @[" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
-            write @["═".repeat(self.hcap-lense_id.runeLen-2), "╕\n"], border_color, DARKBLUE.Fade 0.7
+            write "═".repeat(self.hcap-lense_id.runeLen-5), border_color, main_bg
+            write (if fullscreen: "\x10│\x11" else: "╡↔╞"), Gold, DARKGRAY
+            write "╕\n", border_color, main_bg
         let 
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
@@ -809,8 +817,8 @@ when not defined(FileViewer):
             write rborder, border_color
         # Footing render.
         host.write ["╘", "═".repeat(self.hcap), "╛"]
-        host.loc((self.hcap - self.name_limited.runeLen) div 2 + xoffset, host.vpos())
-        host.write [" ", self.name_limited, " "], (if self.feed_avail: Orange else: Maroon), DARKGRAY
+        host.loc((self.hcap - self.caption_limited.runeLen) div 2 + self.margin, host.vpos())
+        host.write [" ", self.caption_limited, " "], (if self.feed_avail: Orange else: Maroon), DARKGRAY
         # Finalization.
         return self
 
@@ -843,6 +851,7 @@ when not defined(MultiViewer):
     template next_path(self: MultiViewer): string       = self.next_viewer.path
     template inspecting(self: MultiViewer): bool        = not inspector.isNil
     template previewing(self: MultiViewer): bool        = self.inspecting and not self.inspector.fullscreen
+    template fullview(self: MultiViewer): bool          = self.inspecting and self.inspector.fullscreen
     template hint_prefix(self: MultiViewer): string     = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
     template hint_cellwidth(self: MultiViewer): int     = hint_width + self.hint_prefix.runeLen + 1
     template hint_margin(self: MultiViewer): int        = (host.hlines - (self.hint_cellwidth.float * 10.5).int) div 2
@@ -1016,7 +1025,8 @@ when not defined(MultiViewer):
                     if fv_pick == FVControls.none and picked_view_idx >= 0: select picked_view_idx
                 elif MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking & inspector controls.
                     case fv_pick: # FileViewer controls.
-                        of FVControls.lense: inspector.cycle_lenses() # Switch view mode on inspector tag click.
+                        of FVControls.lense:    inspector.cycle_lenses() # Switch view mode on inspector tag click.
+                        of FVControls.minmax:   inspector.switch_fullscreen() # Switch between preview & full modes.
                         elif y == host.vlines-1: # Hints check for click in button bounds to activate it.
                             let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
                             if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): f_key = index.int
@@ -1060,7 +1070,8 @@ when not defined(MultiViewer):
 
     method render(self: MultiViewer): Area {.discardable.} =
         # Commandline/viewers render.
-        if not cmdline.exclusive:
+        if self.fullview: inspector.render() # Fullscreen inspector render.
+        elif not cmdline.exclusive:
             let displaced = if self.previewing: self.next_viewer() else: nil
             var offset = 0
             for view in viewers: 
