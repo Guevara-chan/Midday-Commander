@@ -670,10 +670,10 @@ when not defined(FileViewer):
 
     # --Properties:
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
-    template hcap(self: FileViewer): int         = self.width - border_shift
+    template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * (2 - self.fullscreen.int)
     template screencap(self: FileViewer): int    = self.hcap * self.vcap
-    template margin(self: FileViewer): int       = (if self.fullscreen: 0 else: xoffset)
+    template margin(self: FileViewer): int       = xoffset * (not self.fullscreen).int
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
 
@@ -688,8 +688,10 @@ when not defined(FileViewer):
     proc picked_control(self: FileViewer): FVControls =
         let (x, y) = host.pick()
         if y == 0: # Headerline
-            if x in self.margin+2..self.margin+3+lense_id.runeLen:                return FVControls.lense
-            if x in self.margin+self.hcap-"╡↔╞".runeLen+1..self.margin+self.hcap: return FVControls.minmax
+            if x in self.margin+2..self.margin+3+lense_id.runeLen:
+                return FVControls.lense
+            if x+fullscreen.int*border_shift in self.margin+self.hcap-"╡↔╞".runeLen+1..self.margin+self.hcap:
+                return FVControls.minmax
         return FVControls.none
 
     proc dir_checkout(self: FileViewer, path: string): string =
@@ -801,22 +803,22 @@ when not defined(FileViewer):
         # Header render.
         with host:
             loc(self.margin, 0)
-            write "╒", border_color, main_bg
-            write @[" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
-            write "═".repeat(self.hcap-lense_id.runeLen-5), border_color, main_bg
+            write if fullscreen: "═" else: "╒", border_color, main_bg
+            write [" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
+            write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, main_bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), Gold, DARKGRAY
-            write "╕\n", border_color, main_bg
+            write [if fullscreen: "═" else: "╕", "\n"], border_color, main_bg
         let 
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
         # Rendering loop.
         let render_list = lenses[lense_id](self)
         for line in render_list(): with host:
-            write lborder
+            write if fullscreen: "" else: lborder
             write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
-            write rborder, border_color
+            write if fullscreen: "\n" else: rborder, border_color
         # Footing render.
-        host.write ["╘", "═".repeat(self.hcap), "╛"]
+        host.write [if fullscreen: "═" else: "╘", "═".repeat(self.hcap), if fullscreen: "═" else: "╛"]
         host.loc((self.hcap - self.caption_limited.runeLen) div 2 + self.margin, host.vpos())
         host.write [" ", self.caption_limited, " "], (if self.feed_avail: Orange else: Maroon), DARKGRAY
         # Finalization.
