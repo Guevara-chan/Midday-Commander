@@ -803,9 +803,11 @@ when not defined(FileViewer):
         # Deffered data update.
         defer:
             lense_id = if self.feed_avail: # Data pumping.
+                let start = getTime()
                 while (cache.len < y + self.vcap or pos+self.hexcells < char_total) and not feed.atEnd:
                     cache.add read_data_line()
                     char_total += cache[^1].data.len
+                    if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
                     if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
