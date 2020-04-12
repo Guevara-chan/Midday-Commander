@@ -673,7 +673,7 @@ when not defined(FileViewer):
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * (2 - self.fullscreen.int)
-    template hexcap(self: FileViewer): int       = self.hcap div cell - (self.hcap div (cell*cell)) + 1
+    template hexcap(self: FileViewer): int       = self.hcap div (cell+1)
     template hexcells(self: FileViewer): int     = self.hexcap * self.vcap
     template margin(self: FileViewer): int       = xoffset * (not self.fullscreen).int
     template feed_avail(self: FileViewer): bool  = not feed.isNil
