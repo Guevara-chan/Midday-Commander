@@ -698,7 +698,8 @@ when not defined(FileViewer):
         return FVControls.none
 
     proc vscroll(self: FileViewer, shift = 0) =
-        y   = max(0, min(if last_line > -1: last_line-self.hcap  else: int.high, y + shift))
+        y   = max(0, min(if last_line > -1: last_line-self.vcap  else: int.high, y + shift))
+        #echo last_line-self.hcap
         pos = max(0, min(if feedsize  > -1: feedsize-self.hexcap else: int.high, pos + self.hexcap * shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
