@@ -697,9 +697,9 @@ when not defined(FileViewer):
                 return FVControls.minmax
         return FVControls.none
 
-    proc vscroll(self: FileViewer, shift: int) =
-        y = max(0, min((if last_line > -1: last_line-self.hcap else: int.high), y + shift))
-        pos = max(0, pos + self.hexcap * shift)
+    proc vscroll(self: FileViewer, shift = 0) =
+        y   = max(0, min(if last_line > -1: last_line-self.hcap  else: int.high, y + shift))
+        pos = max(0, min(if feedsize  > -1: feedsize-self.hexcap else: int.high, pos + self.hexcap * shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -792,15 +792,19 @@ when not defined(FileViewer):
 
     proc switch_fullscreen(self: FileViewer) =
         fullscreen = not fullscreen
+        vscroll()
 
     method update(self: FileViewer): Area {.discardable.} =
         # Deffered data update.
         defer:
             lense_id = if self.feed_avail: # Data pumping.
                 while cache.len < y + self.vcap and not feed.atEnd:
-                   cache.add read_data_line()
-                if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
-                if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
+                    cache.add read_data_line()
+                if cache.len > 0: # If there was any data.
+                    if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
+                    if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
+                else: # Special handling for 0-size files.
+                    if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
         # Mouse controls.
         if self.active:
