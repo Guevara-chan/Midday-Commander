@@ -698,8 +698,8 @@ when not defined(FileViewer):
         return FVControls.none
 
     proc vscroll(self: FileViewer, shift = 0) =
-        y   = max(0, min((if last_line > -1: last_line-self.hcap  else: int.high), y + shift))
-        pos = max(0, min((if feedsize  > -1: feedsize-self.hexcap else: int.high), pos + self.hexcap * shift))
+        y   = max(0, min(if last_line > -1: last_line-self.hcap  else: int.high, y + shift))
+        pos = max(0, min(if feedsize  > -1: feedsize-self.hexcap else: int.high, pos + self.hexcap * shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -729,7 +729,7 @@ when not defined(FileViewer):
             ext_sum.join("\n")
         ].join("\n")
 
-    proc close(self: FileViewer) =
+    proc close(self: FileViewer): FileViewer {.discardable.} =
         if self.feed_avail:
             feed.close()
             feed = nil
@@ -738,6 +738,7 @@ when not defined(FileViewer):
         lense_switch = false
         (x, pos, y) = (0, 0, 0)
         (last_line, feedsize) = (-1, -1)
+        return self
 
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
@@ -810,6 +811,11 @@ when not defined(FileViewer):
         # Mouse controls.
         if self.active:
             vscroll -GetMouseWheelMove()
+        if MOUSE_Left_Button.IsMouseButtonReleased:
+            case picked_control():
+                of FVControls.lense:    cycle_lenses() # Switch view mode on inspector tag click.
+                of FVControls.minmax:   switch_fullscreen() # Switch between preview & full modes.
+                else: discard
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -841,7 +847,7 @@ when not defined(FileViewer):
         return self
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
-        result = FileViewer(host: term, xoffset: xoffset, last_line: -1)
+        result = FileViewer(host: term, xoffset: xoffset).close()
         type fix = proc (fv: FileViewer): iterator (): string{.closure.}{.closure.} # Siome compiler glitches.
         result.lenses = {"ASCII": ascii_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
         if src != "": result.open src
@@ -1033,7 +1039,8 @@ when not defined(MultiViewer):
         f_key = 0 # F-key emulator.
         try:
             cmdline.update()
-            if not cmdline.exclusive:
+            if self.fullview: inspector.update()
+            elif not cmdline.exclusive:
                 # Mouse controls.
                 let
                     (x, y) = host.pick()
@@ -1041,13 +1048,10 @@ when not defined(MultiViewer):
                     fv_pick = if inspector.isNil: FVControls.none else: inspector.picked_control
                 if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown: # DirViewers picking.
                     if fv_pick == FVControls.none and picked_view_idx >= 0: select picked_view_idx
-                elif MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking & inspector controls.
-                    case fv_pick: # FileViewer controls.
-                        of FVControls.lense:    inspector.cycle_lenses() # Switch view mode on inspector tag click.
-                        of FVControls.minmax:   inspector.switch_fullscreen() # Switch between preview & full modes.
-                        elif y == host.vlines-1: # Hints check for click in button bounds to activate it.
-                            let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
-                            if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): f_key = index.int
+                elif MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking.
+                    if y == host.vlines-1: # Hints check for click in button bounds to activate it.
+                        let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
+                        if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): f_key = index.int
                 # Drag/drop handling.
                 let droplist = check_droplist()                
                 if droplist.len > 0:
