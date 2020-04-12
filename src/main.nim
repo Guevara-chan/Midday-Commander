@@ -657,32 +657,35 @@ when not defined(FileViewer):
     type FileViewer = ref object of Area
         host: TerminalEmu
         feed: Stream
-        cache: seq[DataLine]        
-        x, y, xoffset: int
+        cache: seq[DataLine]
         src, lense_id: string
         fullscreen, lense_switch: bool
+        x, y, pos, xoffset, last_line, feedsize: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     type FVControls = enum
         none, lense, minmax
     const
         dl_cap = ['\n']
         border_shift = 2
+        cell = "FF ".len
 
     # --Properties:
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * (2 - self.fullscreen.int)
-    template screencap(self: FileViewer): int    = self.hcap * self.vcap
+    template hexcap(self: FileViewer): int       = self.hcap div cell - (self.hcap div (cell*cell)) + 1
     template margin(self: FileViewer): int       = xoffset * (not self.fullscreen).int
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
+    template active(self: FileViewer): bool      = self.fullscreen
 
     proc caption_limited(self: FileViewer): string =        
         if self.caption.runeLen > self.hcap-2: &"…{self.caption.runeSubStr(-self.hcap+4)}" else: self.caption
 
     iterator cached_chars(self: FileViewer, start = 0): char =
         for line in cache:
-            for chr in line.data: yield chr
+            if line.origin >= start or start in line.origin..line.origin+line.data.len:
+                for idx, chr in line.data: (if idx+line.origin >= start: yield chr)
 
     # --Methods goes here:
     proc picked_control(self: FileViewer): FVControls =
@@ -693,6 +696,10 @@ when not defined(FileViewer):
             if x+fullscreen.int*border_shift in self.margin+self.hcap-"╡↔╞".runeLen+1..self.margin+self.hcap:
                 return FVControls.minmax
         return FVControls.none
+
+    proc vscroll(self: FileViewer, shift: int) =
+        y = max(0, min((if last_line > -1: last_line-self.hcap else: int.high), y + shift))
+        pos = max(0, pos + self.hexcap * shift)
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -730,6 +737,7 @@ when not defined(FileViewer):
         cache.setLen 0
         (x, y) = (0, 0)
         lense_switch = false
+        (last_line, feedsize) = (-1, -1)
 
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
@@ -761,24 +769,22 @@ when not defined(FileViewer):
             for line in fragment: yield line.data.subStr(x)
 
     proc hex_lense(self: FileViewer): iterator:string =
-        const cell = "FF ".len
-        let per_line = self.hcap div cell - (self.hcap div (cell*cell)) + 1
         var 
             accum: seq[string]
             recap: seq[char]
             lines_left = self.vcap
         return iterator:string =
             template row_out(sum = recap.join "") = yield accum.join("") & sum; lines_left.dec
-            for chr in self.cached_chars: 
+            for chr in self.cached_chars(pos): 
                 accum.add &"{chr.int32:02X}" & # Smart delimiting.
-                    (if accum.len == per_line-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
+                    (if accum.len == self.hexcap-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
                 recap.add chr
-                if accum.len >= per_line:
+                if accum.len >= self.hexcap:
                     row_out()                    
                     if lines_left == 0: return
                     accum.setLen 0
                     recap.setLen 0
-            if accum.len > 0: row_out ' '.repeat(per_line*cell-accum.len*cell-1) & "\xBA" & recap.join ""
+            if accum.len > 0: row_out ' '.repeat(self.hexcap*cell-accum.len*cell-1) & "\xBA" & recap.join ""
             for exceed in 1..lines_left: yield ""
 
     proc cycle_lenses(self: FileViewer) =
@@ -788,12 +794,17 @@ when not defined(FileViewer):
         fullscreen = not fullscreen
 
     method update(self: FileViewer): Area {.discardable.} =
-        defer: # Deffered date update.
+        # Deffered data update.
+        defer:
             lense_id = if self.feed_avail: # Data pumping.
-                while cache.len < y + self.vcap:
+                while cache.len < y + self.vcap and not feed.atEnd:
                    cache.add read_data_line()
+                if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
                 if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
-            else: "ERROR" # Noise garden
+            else: "ERROR" # Noise garden.
+        # Mouse controls.
+        if self.active:
+            vscroll -GetMouseWheelMove()
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -825,7 +836,7 @@ when not defined(FileViewer):
         return self
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
-        result = FileViewer(host: term, xoffset: xoffset)
+        result = FileViewer(host: term, xoffset: xoffset, last_line: -1)
         type fix = proc (fv: FileViewer): iterator (): string{.closure.}{.closure.} # Siome compiler glitches.
         result.lenses = {"ASCII": ascii_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
         if src != "": result.open src
