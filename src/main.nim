@@ -12,12 +12,14 @@ when not defined(Meta):
 
     # --Service classes:
     type Area {.inheritable.} = ref object
-        repeater, clicker: Time
         parent: Area
+        lapse:  int64
+        repeater, clicker: Time
     method update(self: Area): Area {.discardable base.} = discard
     method render(self: Area): Area {.discardable base.} = discard
     proc norepeat(self: Area): bool = 
-        if (getTime() - repeater).inMilliseconds > 110: repeater = getTime(); return true
+        if (getTime() - repeater).inMilliseconds - lapse > 110: repeater = getTime(); result = true
+        lapse = 0
 
     # --Service procs:
     template abort(reason = "")     = raise newException(abort_ex, reason)
@@ -1079,7 +1081,10 @@ when not defined(MultiViewer):
                 if self.previewing:
                     inspector.xoffset = self.next_viewer.xoffset
                     if self.active.hl_changed: inspect()
-                if self.inspecting: inspector.update()
+                if self.inspecting: # Update using timing info.
+                    let start = getTime()
+                    inspector.update()
+                    self.active.lapse = (getTime() - start).inMilliseconds
                 # Viewer update.
                 self.active.update()
                 if dirty:
