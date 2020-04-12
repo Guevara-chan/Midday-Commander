@@ -698,8 +698,8 @@ when not defined(FileViewer):
         return FVControls.none
 
     proc vscroll(self: FileViewer, shift = 0) =
-        y   = max(0, min(if last_line > -1: last_line-self.hcap  else: int.high, y + shift))
-        pos = max(0, min(if feedsize  > -1: feedsize-self.hexcap else: int.high, pos + self.hexcap * shift))
+        y   = max(0, min((if last_line > -1: last_line-self.hcap  else: int.high), y + shift))
+        pos = max(0, min((if feedsize  > -1: feedsize-self.hexcap else: int.high), pos + self.hexcap * shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -735,8 +735,8 @@ when not defined(FileViewer):
             feed = nil
         src = ""
         cache.setLen 0
-        (x, y) = (0, 0)
         lense_switch = false
+        (x, pos, y) = (0, 0, 0)
         (last_line, feedsize) = (-1, -1)
 
     proc open(self: FileViewer, path: string, force = false) =
@@ -804,6 +804,7 @@ when not defined(FileViewer):
                     if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
                     if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
+                    (last_line, feedsize) = (0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
         # Mouse controls.
