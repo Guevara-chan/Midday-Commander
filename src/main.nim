@@ -660,7 +660,7 @@ when not defined(FileViewer):
         cache: seq[DataLine]
         src, lense_id: string
         fullscreen, lense_switch: bool
-        x, y, pos, xoffset, last_line, feedsize: int
+        x, y, pos, xoffset, last_line, feedsize, char_total: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     type FVControls = enum
         none, lense, minmax
@@ -674,6 +674,7 @@ when not defined(FileViewer):
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * (2 - self.fullscreen.int)
     template hexcap(self: FileViewer): int       = self.hcap div cell - (self.hcap div (cell*cell)) + 1
+    template hexcells(self: FileViewer): int     = self.hexcap * self.vcap
     template margin(self: FileViewer): int       = xoffset * (not self.fullscreen).int
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
@@ -698,9 +699,8 @@ when not defined(FileViewer):
         return FVControls.none
 
     proc vscroll(self: FileViewer, shift = 0) =
-        y   = max(0, min(if last_line > -1: last_line-self.vcap  else: int.high, y + shift))
-        #echo last_line-self.hcap
-        pos = max(0, min(if feedsize  > -1: feedsize-self.hexcap else: int.high, pos + self.hexcap * shift))
+        y   = max(0, min(if last_line > -1: last_line-self.vcap    else: int.high, y + shift))
+        pos = max(0, min(if feedsize  > -1: feedsize-self.hexcells else: int.high, pos + self.hexcap * shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -736,6 +736,7 @@ when not defined(FileViewer):
             feed = nil
         src = ""
         cache.setLen 0
+        char_total = 0
         lense_switch = false
         (x, pos, y) = (0, 0, 0)
         (last_line, feedsize) = (-1, -1)
@@ -800,8 +801,9 @@ when not defined(FileViewer):
         # Deffered data update.
         defer:
             lense_id = if self.feed_avail: # Data pumping.
-                while cache.len < y + self.vcap and not feed.atEnd:
+                while (cache.len < y + self.vcap or pos+self.hexcells < char_total) and not feed.atEnd:
                     cache.add read_data_line()
+                    char_total += cache[^1].data.len
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
                     if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
