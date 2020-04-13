@@ -823,6 +823,12 @@ when not defined(FileViewer):
                 of FVControls.lense:    cycle_lenses() # Switch view mode on inspector tag click.
                 of FVControls.minmax:   switch_fullscreen() # Switch between preview & full modes.
                 else: discard
+        # Keyboard controls.
+        if self.active:
+            if KEY_PageUp.IsKeyDown:      (if norepeat(): vscroll -self.vcap)
+            elif KEY_PageDown.IsKeyDown:  (if norepeat(): vscroll +self.vcap)
+            elif KEY_Up.IsKeyDown:        (if norepeat(): vscroll -1)
+            elif KEY_Down.IsKeyDown:      (if norepeat(): vscroll 1)
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
