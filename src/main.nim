@@ -829,6 +829,9 @@ when not defined(FileViewer):
         # Init setup.        
         host.margin = self.margin
         let main_bg = DARKBLUE.Fade 0.7
+        proc write_centered(text: string, color: Color) =
+            host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
+            host.write @[" ", text, " "], color, DARKGRAY
         # Header render.
         with host:
             loc(self.margin, 0)
@@ -836,20 +839,21 @@ when not defined(FileViewer):
             write [" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
             write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, main_bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), Gold, DARKGRAY
-            write [if fullscreen: "═" else: "╕", "\n"], border_color, main_bg
+            write [if fullscreen: "═" else: "╕", ""], border_color, main_bg
+        if self.feed_avail and (y>0 or fullscreen): write_centered &"Line: {y} /off={pos:X}", RAYWHITE
+        host.write "\n"
+        # Rendering loop.
         let 
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
-        # Rendering loop.
-        let render_list = lenses[lense_id](self)
+            render_list = lenses[lense_id](self)
         for line in render_list(): with host:
             write if fullscreen: "" else: lborder
-            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
+            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, main_bg, raw=true
             write if fullscreen: "\n" else: rborder, border_color
         # Footing render.
         host.write [if fullscreen: "═" else: "╘", "═".repeat(self.hcap), if fullscreen: "═" else: "╛"]
-        host.loc((self.hcap - self.caption_limited.runeLen) div 2 + self.margin, host.vpos())
-        host.write [" ", self.caption_limited, " "], (if self.feed_avail: Orange else: Maroon), DARKGRAY
+        write_centered self.caption_limited, (if self.feed_avail: Orange else: Maroon)
         # Finalization.
         return self
 
