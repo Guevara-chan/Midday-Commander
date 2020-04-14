@@ -671,7 +671,7 @@ when not defined(FileViewer):
         x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     type FVControls = enum
-        none, lense, minmax
+        none, lense, minmax, lscroll, rscroll
     const
         dl_cap = ['\n']
         border_shift = 2
@@ -700,11 +700,15 @@ when not defined(FileViewer):
     # --Methods goes here:
     proc picked_control(self: FileViewer): FVControls =
         let (x, y) = host.pick()
+
         if y == 0: # Headerline
             if x in self.margin+2..self.margin+3+lense_id.runeLen:
                 return FVControls.lense
             if x+fullscreen.int*border_shift in self.margin+self.hcap-"╡↔╞".runeLen+1..self.margin+self.hcap:
                 return FVControls.minmax
+        elif y == self.vcap+1:
+            if x == 0:           return FVControls.lscroll
+            if x == self.hcap-1: return FVControls.rscroll
         return FVControls.none
 
     proc vscroll(self: FileViewer, shift = 0) =
@@ -831,6 +835,11 @@ when not defined(FileViewer):
         # Mouse controls.
         if self.active:
             vscroll -GetMouseWheelMove()
+            if MOUSE_Left_Button.IsMouseButtonDown:
+                case picked_control():
+                    of FVControls.lscroll: echo "!"; (if norepeat(): hscroll -1)
+                    of FVControls.rscroll: (if norepeat(): hscroll +1)
+                    else: discard
         if MOUSE_Left_Button.IsMouseButtonReleased:
             case picked_control():
                 of FVControls.lense:    cycle_lenses() # Switch view mode on inspector tag click.
