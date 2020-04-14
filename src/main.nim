@@ -705,7 +705,6 @@ when not defined(FileViewer):
         pos = max(0, min(if feedsize  > -1: feedsize-self.hexcells else: int.high, pos + self.hexcap * shift))
 
     proc hscroll(self: FileViewer, shift = 0) =
-        echo widest_line-self.hcap
         x = max(0, min(widest_line-self.hcap, x + shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
