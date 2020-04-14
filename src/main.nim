@@ -662,7 +662,7 @@ when not defined(FileViewer):
         cache: seq[DataLine]
         src, lense_id: string
         fullscreen, lense_switch: bool
-        x, y, pos, xoffset, last_line, feedsize, char_total: int
+        x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     type FVControls = enum
         none, lense, minmax
@@ -705,7 +705,8 @@ when not defined(FileViewer):
         pos = max(0, min(if feedsize  > -1: feedsize-self.hexcells else: int.high, pos + self.hexcap * shift))
 
     proc hscroll(self: FileViewer, shift = 0) =
-        x = max(0, x + shift)
+        echo widest_line-self.hcap
+        x = max(0, min(widest_line-self.hcap, x + shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -742,6 +743,7 @@ when not defined(FileViewer):
         src = ""
         cache.setLen 0
         char_total = 0
+        widest_line = 0
         lense_switch = false
         (x, pos, y) = (0, 0, 0)
         (last_line, feedsize) = (-1, -1)
@@ -808,8 +810,10 @@ when not defined(FileViewer):
             lense_id = if self.feed_avail: # Data pumping.
                 let start = getTime()
                 while (cache.len < y + self.vcap or pos+self.hexcells < char_total) and not feed.atEnd:
-                    cache.add read_data_line()
-                    char_total += cache[^1].data.len
+                    let line = read_data_line()
+                    cache.add line
+                    char_total += line.data.len
+                    widest_line = max(line.data.len, widest_line)
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
@@ -1060,7 +1064,7 @@ when not defined(MultiViewer):
     method update(self: MultiViewer): Area {.discardable.} =
         f_key = 0 # F-key emulator.
         try:
-            cmdline.update()
+            if not self.fullview: cmdline.update()
             if self.fullview: inspector.update()
             elif not cmdline.exclusive:
                 # Mouse controls.
