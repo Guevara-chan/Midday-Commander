@@ -273,6 +273,7 @@ when not defined(DirViewer):
         dir_stat, sel_stat: BreakDown
         dirty, active, visible, hl_changed: bool
         hline, origin, xoffset, file_count, name_col, size_col, date_col, total_width, viewer_width: int
+        sorters: seq[proc(x: DirEntry, y: DirEntry): int]
     const
         hdr_height      = 2
         foot_height     = 3
@@ -322,9 +323,11 @@ when not defined(DirViewer):
     proc scroll_to_name(self: DirViewer, name: string) =
         for idx, entry in list: (if entry.name == name: scroll_to idx)
 
+    proc name_sorter(x: DirEntry, y: DirEntry): int =
+        if not x.is_dir and y.is_dir: return 1
+
     proc organize(self: DirViewer): auto {.discardable.} =
-        list = list.sorted proc (x: DirEntry, y: DirEntry): int =
-            if not x.is_dir and y.is_dir: return 1
+        list = list.sorted sorters[0]
         return self
 
     proc refresh(self: DirViewer): auto {.discardable.} =
@@ -463,7 +466,10 @@ when not defined(DirViewer):
         return self
 
     proc newDirViewer(term: TerminalEmu): DirViewer =
-        DirViewer(host: term, visible: true).chdir(getAppFilename().root_dir)
+        type fix = proc(x: DirEntry, y: DirEntry): int {.closure.}
+        result = DirViewer(host: term, visible: true)
+        result.sorters = collect(newSeq): (for sorter in @[name_sorter]: sorter.fix)
+        result.chdir(getAppFilename().root_dir)
 # -------------------- #
 when not defined(CommandLine):
     type CommandLine = ref object of Area
