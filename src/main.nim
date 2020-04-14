@@ -683,6 +683,7 @@ when not defined(FileViewer):
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * (2 - self.fullscreen.int)
     template hexcap(self: FileViewer): int       = self.hcap div (cell+1)
     template hexcells(self: FileViewer): int     = self.hexcap * self.vcap
+    template right_edge(self: FileViewer): int   = widest_line - self.hcap
     template margin(self: FileViewer): int       = xoffset * (not self.fullscreen).int
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
@@ -711,7 +712,7 @@ when not defined(FileViewer):
         pos = max(0, min(if feedsize  > -1: feedsize-self.hexcells else: int.high, pos + self.hexcap * shift))
 
     proc hscroll(self: FileViewer, shift = 0) =
-        x = max(0, min(widest_line-self.hcap, x + shift))
+        x = max(0, min(self.right_edge, x + shift))
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -873,7 +874,13 @@ when not defined(FileViewer):
             write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             write if fullscreen: "\n" else: rborder, border_color
         # Footing render.
-        host.write [if fullscreen: "═" else: "╘", "═".repeat(self.hcap), if fullscreen: "═" else: "╛"]
+        if not fullscreen:  host.write "╘"
+        elif x>0:           host.write "\x11", Gold, DARKGRAY
+        else:               host.write "═"
+        host.write "═".repeat(self.hcap - fullscreen.int * 2), border_color, main_bg
+        if not fullscreen:  host.write "╛"
+        elif x<self.right_edge: host.write "\x10", Gold, DARKGRAY
+        else:               host.write "═"
         write_centered self.caption_limited, (if self.feed_avail: Orange else: Maroon)
         # Finalization.
         return self
