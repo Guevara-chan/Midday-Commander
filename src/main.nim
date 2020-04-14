@@ -1,6 +1,6 @@
-import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, std/with
+import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import browsers, threadpool, raylib
+import std/with, threadpool, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -805,8 +805,8 @@ when not defined(FileViewer):
     proc cycle_lenses(self: FileViewer) =
         lense_switch = not lense_switch
 
-    proc switch_fullscreen(self: FileViewer) =
-        fullscreen = not fullscreen
+    proc switch_fullscreen(self: FileViewer, new_state = -1) =
+        fullscreen = if new_state == -1: not fullscreen else: new_state.bool
         vscroll(); hscroll()
 
     method update(self: FileViewer): Area {.discardable.} =
@@ -843,6 +843,7 @@ when not defined(FileViewer):
             elif KEY_Down.IsKeyDown:      (if norepeat(): vscroll 1)
             elif KEY_Left.IsKeyDown:      (if norepeat(): hscroll -1)
             elif KEY_Right.IsKeyDown:     (if norepeat(): hscroll 1)
+            elif KEY_Escape.IsKeyPressed: switch_fullscreen 0
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -861,7 +862,7 @@ when not defined(FileViewer):
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), Gold, DARKGRAY
             write [if fullscreen: "═" else: "╕", ""], border_color, main_bg
         if self.feed_avail and (y>0 or x>0 or fullscreen): write_centered &"{y}:{x} /off={pos:X}", RAYWHITE
-        host.write "\n"
+        host.write "\n", border_color, main_bg
         # Rendering loop.
         let 
             lborder = if xoffset > 0: "┤" else: "│"
@@ -869,7 +870,7 @@ when not defined(FileViewer):
             render_list = lenses[lense_id](self)
         for line in render_list(): with host:
             write if fullscreen: "" else: lborder
-            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, main_bg, raw=true
+            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
             write if fullscreen: "\n" else: rborder, border_color
         # Footing render.
         host.write [if fullscreen: "═" else: "╘", "═".repeat(self.hcap), if fullscreen: "═" else: "╛"]
@@ -1126,7 +1127,7 @@ when not defined(MultiViewer):
 
     method render(self: MultiViewer): Area {.discardable.} =
         # Commandline/viewers render.
-        if self.fullview: inspector.render() # Fullscreen inspector render.
+        if self.fullview: inspector.render(); return # Fullscreen inspector render.
         elif not cmdline.exclusive:
             let displaced = if self.previewing: self.next_viewer() else: nil
             var offset = 0
