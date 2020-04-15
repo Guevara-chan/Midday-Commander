@@ -266,6 +266,8 @@ when not defined(DirEntry):
 when not defined(DirViewer):
     type BreakDown = object
         files, dirs, bytes: BiggestInt
+    type SortCriteria = enum
+        default = -1, name, ext, size, date
     type DirViewer = ref object of Area
         host: TerminalEmu
         path: string
@@ -274,8 +276,7 @@ when not defined(DirViewer):
         dirty, active, visible, hl_changed: bool
         hline, origin, xoffset, file_count, name_col, size_col, date_col, total_width, viewer_width: int
         sorters: seq[proc(x: DirEntry, y: DirEntry): int]
-    type SortCriteria = enum
-        name, ext, size, date
+        sorter: SortCriteria
     const
         hdr_height      = 2
         foot_height     = 3
@@ -328,8 +329,8 @@ when not defined(DirViewer):
     proc name_sorter(x: DirEntry, y: DirEntry): int =
         if not x.is_dir and y.is_dir: return 1
 
-    proc organize(self: DirViewer, criteria = SortCriteria.name): auto {.discardable.} =
-        list = list.sorted sorters[criteria.int]
+    proc organize(self: DirViewer, criteria = SortCriteria.default): auto {.discardable.} =
+        list = list.sorted sorters[(if criteria == SortCriteria.default: sorter else: criteria).int]
         return self
 
     proc refresh(self: DirViewer): auto {.discardable.} =
