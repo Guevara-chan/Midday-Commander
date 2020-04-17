@@ -267,7 +267,7 @@ when not defined(DirViewer):
     type BreakDown = object
         files, dirs, bytes: BiggestInt
     type SortCriteria = enum
-        default = -1, name, ext, size, date
+        default = -1, name, ext, size, mtime
     type DirViewer = ref object of Area
         host: TerminalEmu
         path: string
@@ -326,10 +326,24 @@ when not defined(DirViewer):
     proc scroll_to_name(self: DirViewer, name: string) =
         for idx, entry in list: (if entry.name == name: scroll_to idx)
 
-    proc name_sorter(x: DirEntry, y: DirEntry): int =
-        if not x.is_dir and y.is_dir: return 1
+    template sorter_base(comparator: untyped) =
+        return if not x.is_dir and y.is_dir: 1
+        elif x.is_dir and not y.is_dir:      -1
+        else:                                comparator
 
-    proc organize(self: DirViewer, criteria = SortCriteria.default): auto {.discardable.} =
+    proc name_sorter(x: DirEntry, y: DirEntry): int =
+        sorter_base 0
+
+    proc ext_sorter(x: DirEntry, y: DirEntry): int =
+        sorter_base cmp(x.name.splitFile.ext, y.name.splitFile.ext)
+
+    proc size_sorter(x: DirEntry, y: DirEntry): int =
+        sorter_base cmp(x.size, y.size)
+
+    proc mtime_sorter(x: DirEntry, y: DirEntry): int =
+        sorter_base cmp(x.mtime, y.mtime)
+
+    proc organize(self: DirViewer, criteria = SortCriteria.ext): auto {.discardable.} =
         list = list.sorted sorters[(if criteria == SortCriteria.default: sorter else: criteria).int]
         return self
 
@@ -471,7 +485,7 @@ when not defined(DirViewer):
     proc newDirViewer(term: TerminalEmu): DirViewer =
         type fix = proc(x: DirEntry, y: DirEntry): int {.closure.}
         result = DirViewer(host: term, visible: true)
-        result.sorters = collect(newSeq): (for sorter in @[name_sorter]: sorter.fix)
+        result.sorters = collect(newSeq): (for sorter in @[name_sorter,ext_sorter,size_sorter,mtime_sorter]:sorter.fix)
         result.chdir(getAppFilename().root_dir)
 # -------------------- #
 when not defined(CommandLine):
