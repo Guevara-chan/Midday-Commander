@@ -343,7 +343,7 @@ when not defined(DirViewer):
     proc mtime_sorter(x: DirEntry, y: DirEntry): int =
         sorter_base cmp(x.mtime, y.mtime)
 
-    proc organize(self: DirViewer, criteria = SortCriteria.ext): auto {.discardable.} =
+    proc organize(self: DirViewer, criteria = SortCriteria.default): auto {.discardable.} =
         list = list.sorted sorters[(if criteria == SortCriteria.default: sorter else: criteria).int]
         return self
 
