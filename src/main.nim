@@ -406,6 +406,11 @@ when not defined(DirViewer):
         total_width  = name_col + size_col + date_col + 2
         viewer_width = total_width + 2
 
+    proc switch_sorter(self: DirViewer, new_criteria = SortCriteria.default) =
+        sorter = if new_criteria == SortCriteria.default: ((sorter.int+1) %% SortCriteria.high.int).SortCriteria
+        else: new_criteria
+        organize()
+
     method update(self: DirViewer): Area {.discardable.} =
         # Init setup.
         hl_changed   = false
