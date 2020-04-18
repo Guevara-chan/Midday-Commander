@@ -443,6 +443,9 @@ when not defined(DirViewer):
         return self
 
     method render(self: DirViewer): Area {.discardable.} =
+        # Aux template.
+        template sort_mark(txt: string, crit: SortCriteria, mark = "\x17"): string =
+            txt & (if self.sorter == crit: mark else: "")
         # Init setup.
         if not visible: return self
         host.margin = xoffset
@@ -453,8 +456,9 @@ when not defined(DirViewer):
             write ["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
             loc((total_width - self.path_limited.runeLen) div 2 + xoffset, host.vpos())
             write [" ", self.path_limited, " \n"], (if active: hl_color else: direxit.coloring), DARKGRAY
-            write ["║\a\x02", "Name".center(name_col), "\a\x01│\a\x02", "Size".center(size_col), "\a\x01│\a\x02",
-                "Modify time".center(date_col), "\a\x01║\n"], border_color, DARKBLUE
+            write ["║\a\x02", "Name".sort_mark(SortCriteria.ext, "/ext\x17").center(name_col), "\a\x01│\a\x02", 
+                "Size".sort_mark(SortCriteria.size).center(size_col), "\a\x01│\a\x02",
+                    "Modify time".sort_mark(SortCriteria.mtime).center(date_col), "\a\x01║\n"], border_color, DARKBLUE
         # List rendering.
         for idx, entry in self.render_list:
             let desc = cache_desc(idx)
@@ -1197,10 +1201,10 @@ when not defined(MultiViewer):
         else: # Hot keys.
             var idx: int
             host.loc(self.hint_margin, host.vpos)
-            let (hint_line, enabled) = if control_down():   (" | |byName|byExt|bySize|byModi| | | | ",
-                                                            @[3, 4, 5, 6])
-                else:                                       ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
-                                                            @[1, 3, 5, 6, 7, 8, 10])
+            let (hint_line, enabled) = if control_down(): (" | |byName|byExt|bySize|byModi| | | | ",
+                                                          @[3, 4, 5, 6])
+                else:                                     ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
+                                                          @[1, 3, 5, 6, 7, 8, 10])
             for hint in hint_line.split("|"):
                 idx.inc()
                 host.write [self.hint_prefix, $idx], 
