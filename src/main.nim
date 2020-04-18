@@ -1210,7 +1210,7 @@ when not defined(MultiViewer):
             host.loc(self.hint_margin, host.vpos)
             let (hint_line, enabled) = if control_down(): (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
-                elif shift_down():                        (" | |FView| | | | | | | ",
+                elif shift_down():                        (" | |\x11View\x10| | | | | | | ",
                                                           @[3])
                 else:                                     ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
                                                           @[1, 3, 5, 6, 7, 8, 10])
