@@ -222,6 +222,7 @@ when not defined(TerminalEmu):
         (result.title, result.min_width, result.min_height) = (title, min_width, min_height)
         # Finalization.
         result.resize(110, 33) # Most tested size.
+        SetWindowMinSize(GetScreenWidth(), GetScreenHeight())
 # -------------------- #
 when not defined(DirEntry):
     type DirEntryDesc = tuple[id: string, metrics: string, time_stamp: string, coloring: Color]
