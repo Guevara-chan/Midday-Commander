@@ -882,7 +882,8 @@ when not defined(FileViewer):
             elif KEY_Down.IsKeyDown:      (if norepeat(): vscroll 1)
             elif KEY_Left.IsKeyDown:      (if norepeat(): hscroll -1)
             elif KEY_Right.IsKeyDown:     (if norepeat(): hscroll 1)
-            elif KEY_Escape.IsKeyPressed: switch_fullscreen 0
+            elif KEY_Escape.IsKeyPressed: return nil
+            elif KEY_F3.IsKeyPressed and not shift_down(): switch_fullscreen 0
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -1088,7 +1089,7 @@ when not defined(MultiViewer):
 
     proc switch_inspector_fs(self: MultiViewer) =
         if not self.inspecting: inspect()
-        self.inspector.switch_fullscreen()
+        self.inspector.switch_fullscreen 1
 
     proc switch_sorter(self: MultiViewer, criteria = SortCriteria.default) =
         self.active.switch_sorter criteria
@@ -1126,7 +1127,7 @@ when not defined(MultiViewer):
         f_key = 0 # F-key emulator.
         try:
             if not self.fullview: cmdline.update()
-            if self.fullview: inspector.update()
+            if self.fullview: (if inspector.update().isNil: uninspect())
             elif not cmdline.exclusive:
                 # Mouse controls.
                 let
