@@ -332,7 +332,7 @@ when not defined(DirViewer):
         else:                                comparator
 
     proc name_sorter(x: DirEntry, y: DirEntry): int =
-        sorter_base 0
+        sorter_base cmp(x.name, y.name)
 
     proc ext_sorter(x: DirEntry, y: DirEntry): int =
         sorter_base cmp(x.name.splitFile.ext, y.name.splitFile.ext)
@@ -859,7 +859,7 @@ when not defined(FileViewer):
             vscroll -GetMouseWheelMove()
             if MOUSE_Left_Button.IsMouseButtonDown:
                 case picked_control():
-                    of FVControls.lscroll: echo "!"; (if norepeat(): hscroll -1)
+                    of FVControls.lscroll: (if norepeat(): hscroll -1)
                     of FVControls.rscroll: (if norepeat(): hscroll +1)
                     else: discard
         if MOUSE_Left_Button.IsMouseButtonReleased:
@@ -973,6 +973,10 @@ when not defined(MultiViewer):
     proc warn(self: MultiViewer, message: string): int =
         if not watcher.isNil: watcher.frameskip = true
         return newAlert(host, self, message).answer
+
+    proc show_help(self: MultiViewer) =
+        cmdline.fullscreen = true
+        for hint in help: cmdline.record(hint)
 
     proc navigate(self: MultiViewer, path: string) =
         discard self.active.chdir path
@@ -1132,16 +1136,23 @@ when not defined(MultiViewer):
                         select picked_view_idx
                         receive droplist
                     elif y == host.vlines - service_height: cmdline.paste(droplist[0])
-                # Hint controls (main).
-                if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help:cmdline.record(hint))
-                elif f_key==3 or KEY_F3.IsKeyPressed:   switch_inspector()
-                elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
-                elif f_key==6 or KEY_F6.IsKeyPressed:   request_moving()
-                elif f_key==7 or KEY_F7.IsKeyPressed:   request_new_dir()
-                elif f_key==8 or KEY_F8.IsKeyPressed:   request_deletion()
-                elif f_key==10 or KEY_F10.IsKeyPressed: quit()
+                # Hint controls (ctrl+).
+                if control_down():
+                    if   f_key==3 or KEY_F3.IsKeyPressed: switch_sorter SortCriteria.name
+                    elif f_key==4 or KEY_F4.IsKeyPressed: switch_sorter SortCriteria.ext
+                    elif f_key==5 or KEY_F5.IsKeyPressed: switch_sorter SortCriteria.size
+                    elif f_key==6 or KEY_F6.IsKeyPressed: switch_sorter SortCriteria.mtime
+                # Hint controls (vanilla).
+                else:
+                    if   f_key==1 or KEY_F1.IsKeyPressed:   show_help()
+                    elif f_key==3 or KEY_F3.IsKeyPressed:   switch_inspector()
+                    elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
+                    elif f_key==6 or KEY_F6.IsKeyPressed:   request_moving()
+                    elif f_key==7 or KEY_F7.IsKeyPressed:   request_new_dir()
+                    elif f_key==8 or KEY_F8.IsKeyPressed:   request_deletion()
+                    elif f_key==10 or KEY_F10.IsKeyPressed: quit()
                 # Extra controls.
-                elif KEY_Home.IsKeyPressed:             request_navigation()
+                if KEY_Home.IsKeyPressed:               request_navigation()
                 elif KEY_Tab.IsKeyPressed:              select(self.next_index)
                 elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
