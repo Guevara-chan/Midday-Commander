@@ -97,7 +97,8 @@ when not defined(Meta):
         "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
         "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
-        "\a\x07Ctrl+\a\x02F3-F6:\a\x01   sort entry list by name/extension/size/modification time ",
+        "\a\x07Ctrl+\a\x02F4-F7:\a\x01   sort entry list by name/extension/size/modification time ",
+        "\a\x07Shift+\a\x02F3:\a\x01     view hilited entry in full",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
         "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
         "\a\x07Numpad|\a\x02+:\a\x01     reqest pattern for mass selection in current dir",
@@ -1084,6 +1085,10 @@ when not defined(MultiViewer):
     proc switch_inspector(self: MultiViewer) =
         if self.inspecting: uninspect() else: inspect()
 
+    proc switch_inspector_fs(self: MultiViewer) =
+        if not self.inspecting: inspect()
+        self.inspector.switch_fullscreen()
+
     proc switch_sorter(self: MultiViewer, criteria = SortCriteria.default) =
         self.active.switch_sorter criteria
 
@@ -1146,6 +1151,9 @@ when not defined(MultiViewer):
                     elif f_key==4 or KEY_F4.IsKeyPressed: switch_sorter SortCriteria.ext
                     elif f_key==5 or KEY_F5.IsKeyPressed: switch_sorter SortCriteria.size
                     elif f_key==6 or KEY_F6.IsKeyPressed: switch_sorter SortCriteria.mtime
+                # Hint controls (shift+).
+                elif shift_down():
+                    if   f_key==3 or KEY_F3.IsKeyPressed: switch_inspector_fs()
                 # Hint controls (vanilla).
                 else:
                     if   f_key==1 or KEY_F1.IsKeyPressed:   show_help()
@@ -1202,6 +1210,8 @@ when not defined(MultiViewer):
             host.loc(self.hint_margin, host.vpos)
             let (hint_line, enabled) = if control_down(): (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
+                elif shift_down():                        (" | |FView| | | | | | | ",
+                                                          @[3])
                 else:                                     ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
                                                           @[1, 3, 5, 6, 7, 8, 10])
             for hint in hint_line.split("|"):
