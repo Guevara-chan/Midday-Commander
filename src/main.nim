@@ -97,6 +97,7 @@ when not defined(Meta):
         "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
         "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
+        "\a\x07Ctrl+\a\x02F3-F6:\a\x01   sort entry list by name/extension/size/modification time ",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
         "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
         "\a\x07Numpad|\a\x02+:\a\x01     reqest pattern for mass selection in current dir",
