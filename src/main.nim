@@ -995,7 +995,6 @@ when not defined(MultiViewer):
         # Actual transfer.
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
-                let is_dir = src.dirExists
                 wait_task spawn src.transferrer(dest, dir_proc, file_proc)
                 return true
 
