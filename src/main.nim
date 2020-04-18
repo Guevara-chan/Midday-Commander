@@ -329,9 +329,10 @@ when not defined(DirViewer):
         for idx, entry in list: (if entry.name == name: scroll_to idx)
 
     template sorter_base(comparator: untyped) =
-        return if not x.is_dir and y.is_dir: 1
-        elif x.is_dir and not y.is_dir:      -1
-        else:                                comparator
+        return if x.name == ParDir:     -1
+        elif not x.is_dir and y.is_dir: 1
+        elif x.is_dir and not y.is_dir: -1
+        else:                           comparator
 
     proc name_sorter(x: DirEntry, y: DirEntry): int =
         sorter_base cmp(x.name, y.name)
