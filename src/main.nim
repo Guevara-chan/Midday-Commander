@@ -275,7 +275,7 @@ when not defined(DirViewer):
         path: string
         list: seq[DirEntry]
         dir_stat, sel_stat: BreakDown
-        dirty, active, visible, hl_changed: bool
+        dirty, active, visible, hl_changed, inverse_sort: bool
         hline, origin, xoffset, file_count, name_col, size_col, date_col, total_width, viewer_width: int
         sorters: seq[proc(x: DirEntry, y: DirEntry): int]
         sorter: SortCriteria
@@ -328,10 +328,11 @@ when not defined(DirViewer):
     proc scroll_to_name(self: DirViewer, name: string) =
         for idx, entry in list: (if entry.name == name: scroll_to idx)
 
-    template sorter_base(comparator: untyped) =
+    template sorter_base(comparator: untyped, invertor = false) =
         return if x.name == ParDir:     -1
         elif not x.is_dir and y.is_dir: 1
         elif x.is_dir and not y.is_dir: -1
+        elif invertor:                  -comparator
         else:                           comparator
 
     proc name_sorter(x: DirEntry, y: DirEntry): int =
