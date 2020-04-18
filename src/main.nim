@@ -1209,7 +1209,7 @@ when not defined(MultiViewer):
                 host.write [self.hint_prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
                 host.write hint.center(hint_width), BLACK, 
-                    if control_down and idx-3 == self.active.sorter.int: Orange
+                    if control_down and idx-3 == self.active.sorter.int: GOLD
                         elif idx==3 and self.previewing: Orange elif idx in enabled: SKYBLUE else: GRAY
         # Finalization.
         return self
