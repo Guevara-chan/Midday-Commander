@@ -1076,6 +1076,9 @@ when not defined(MultiViewer):
     proc switch_inspector(self: MultiViewer) =
         if self.inspecting: uninspect() else: inspect()
 
+    proc switch_sorter(self: MultiViewer, criteria = SortCriteria.default) =
+        self.active.switch_sorter criteria
+
     proc manage_selection(self: MultiViewer, pattern = "", new_state = true) =
         let mask = if pattern != "": pattern else: "*.*"
         for idx, entry in self.active.list:
@@ -1129,7 +1132,7 @@ when not defined(MultiViewer):
                         select picked_view_idx
                         receive droplist
                     elif y == host.vlines - service_height: cmdline.paste(droplist[0])
-                # Keyboard controls.
+                # Hint controls (main).
                 if f_key==1 or KEY_F1.IsKeyPressed:  (cmdline.fullscreen = true; for hint in help:cmdline.record(hint))
                 elif f_key==3 or KEY_F3.IsKeyPressed:   switch_inspector()
                 elif f_key==5 or KEY_F5.IsKeyPressed:   copy()
@@ -1137,6 +1140,7 @@ when not defined(MultiViewer):
                 elif f_key==7 or KEY_F7.IsKeyPressed:   request_new_dir()
                 elif f_key==8 or KEY_F8.IsKeyPressed:   request_deletion()
                 elif f_key==10 or KEY_F10.IsKeyPressed: quit()
+                # Extra controls.
                 elif KEY_Home.IsKeyPressed:             request_navigation()
                 elif KEY_Tab.IsKeyPressed:              select(self.next_index)
                 elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
@@ -1181,12 +1185,16 @@ when not defined(MultiViewer):
         else: # Hot keys.
             var idx: int
             host.loc(self.hint_margin, host.vpos)
-            for hint in "Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit".split("|"):
+            let (hint_line, enabled) = if control_down():   (" | |byName|byExt|bySize|byModi| | | | ",
+                                                            @[3, 4, 5, 6])
+                else:                                       ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
+                                                            @[1, 3, 5, 6, 7, 8, 10])
+            for hint in hint_line.split("|"):
                 idx.inc()
                 host.write [self.hint_prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
                 host.write hint.center(hint_width), BLACK, 
-                    if idx==3 and self.previewing: Orange elif idx in [1, 3, 5, 6, 7, 8, 10]: SKYBLUE else: GRAY
+                    if idx==3 and self.previewing: Orange elif idx in enabled: SKYBLUE else: GRAY
         # Finalization.
         return self
 
