@@ -731,7 +731,6 @@ when not defined(FileViewer):
     # --Methods goes here:
     proc picked_control(self: FileViewer): FVControls =
         let (x, y) = host.pick()
-
         if y == 0: # Headerline
             if x in self.margin+2..self.margin+3+lense_id.runeLen:
                 return FVControls.lense
