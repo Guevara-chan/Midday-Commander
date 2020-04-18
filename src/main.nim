@@ -898,7 +898,7 @@ when not defined(FileViewer):
             write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, main_bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), Gold, DARKGRAY
             write [if fullscreen: "═" else: "╕", ""], border_color, main_bg
-        if self.feed_avail and (y>0 or x>0 or fullscreen): write_centered &"{y}:{x} /off={pos:X}", RAYWHITE
+        if self.feed_avail and (y>0 or x>0 or fullscreen): write_centered &"{y}:{x} /off={pos:X}", PURPLE
         host.write "\n", border_color, main_bg
         # Rendering loop.
         let 
@@ -1209,8 +1209,9 @@ when not defined(MultiViewer):
                 host.write [self.hint_prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
                 host.write hint.center(hint_width), BLACK, 
-                    if control_down and idx-3 == self.active.sorter.int: GOLD
-                        elif idx==3 and self.previewing: Orange elif idx in enabled: SKYBLUE else: GRAY
+                    if control_down() and idx-3 == self.active.sorter.int: GOLD
+                        elif idx==3 and self.previewing and not control_down(): Orange 
+                            elif idx in enabled: SKYBLUE else: GRAY
         # Finalization.
         return self
 
@@ -1225,6 +1226,6 @@ when not defined(MultiViewer):
 when isMainModule:
     let 
         win = newTerminalEmu("Midday Commander", "res/midday.png", 110, 33,
-            BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON)
+            BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win))
     win.loop_with supervisor
