@@ -444,8 +444,8 @@ when not defined(DirViewer):
 
     method render(self: DirViewer): Area {.discardable.} =
         # Aux template.
-        template sort_mark(txt: string, crit: SortCriteria, mark = "\x17"): string =
-            txt & (if self.sorter == crit: mark else: "")
+        template sort_mark(txt: string, crit: SortCriteria, mark = "*"): string =
+            txt & (if self.sorter == crit: mark.replace "*", "\x17" else: "")
         # Init setup.
         if not visible: return self
         host.margin = xoffset
@@ -456,7 +456,7 @@ when not defined(DirViewer):
             write ["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
             loc((total_width - self.path_limited.runeLen) div 2 + xoffset, host.vpos())
             write [" ", self.path_limited, " \n"], (if active: hl_color else: direxit.coloring), DARKGRAY
-            write ["║\a\x02", "Name".sort_mark(SortCriteria.ext, "/ext\x17").center(name_col), "\a\x01│\a\x02", 
+            write ["║\a\x02", "Name".sort_mark(SortCriteria.ext, "/ext*").center(name_col), "\a\x01│\a\x02", 
                 "Size".sort_mark(SortCriteria.size).center(size_col), "\a\x01│\a\x02",
                     "Modify time".sort_mark(SortCriteria.mtime).center(date_col), "\a\x01║\n"], border_color, DARKBLUE
         # List rendering.
@@ -1210,7 +1210,8 @@ when not defined(MultiViewer):
                 host.write [self.hint_prefix, $idx], 
                     if f_key == idx or (KEY_F1+idx-1).KeyboardKey.IsKeyDown: Maroon else: hl_color, BLACK
                 host.write hint.center(hint_width), BLACK, 
-                    if idx==3 and self.previewing: Orange elif idx in enabled: SKYBLUE else: GRAY
+                    if control_down and idx-3 == self.active.sorter.int: Orange
+                        elif idx==3 and self.previewing: Orange elif idx in enabled: SKYBLUE else: GRAY
         # Finalization.
         return self
 
