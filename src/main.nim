@@ -76,12 +76,12 @@ when not defined(Meta):
         when defined(windows):
             proc GetFinalPathNameByHandle(hFile:Handle, lpszFilePath:WideCStringObj, cchFilePath, dwFlags:int32):int32
                 {.stdcall, dynlib: "kernel32", discardable, importc: "GetFinalPathNameByHandleW".}
-            var
+            let
                 handle = createFileW(newWideCString(path), 0'i32, 0'i32, nil, OPEN_EXISTING, 
                     FILE_FLAG_BACKUP_SEMANTICS, 0)
                 length = GetFinalPathNameByHandle(handle, nil, 0, 0)
+                buffer = newWideCString(" ".repeat(length))
             if length == 0: raiseOSError(osLastError())
-            let buffer = newWideCString(" ".repeat(length))
             GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
             return ($buffer).replace(r"\\?\", "")
         else: return expandSymlink path
@@ -769,7 +769,7 @@ when not defined(FileViewer):
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
         # Analyzing loop.
-        for record in walkDir(path.symlinkTarget, checkDir = true): 
+        for record in walkDir(path.normalizePathEnd(true).symlinkTarget, checkDir = true): 
             if record.path.dirExists: # Subdir registration.
                 subdirs.inc
                 if record.path.isHidden: hidden_dirs.inc
