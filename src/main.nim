@@ -1,6 +1,6 @@
 import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import std/with, threadpool, raylib
+import std/with, winlean, threadpool, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -71,6 +71,21 @@ when not defined(Meta):
             (dir, name, ext) = path.splitFile
             mask = pattern.splitFile
         return name.match_part(mask.name) and ext.undot.match_part(mask.ext.undot)
+
+    proc symlinkTarget(path: string): string =
+        when defined(windows):
+            proc GetFinalPathNameByHandle(hFile:Handle, lpszFilePath:WideCStringObj, cchFilePath, dwFlags:int32):int32
+                {.stdcall, dynlib: "kernel32", importc: "GetFinalPathNameByHandleW".}
+            var
+                handle = createFileW(newWideCString(path), 0'i32, 0'i32, nil, OPEN_EXISTING, 
+                    FILE_FLAG_BACKUP_SEMANTICS, 0)
+                buffer = newWideCString(" ".repeat(38))
+                length = GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
+            while length > len(buffer):
+                 buffer = newWideCString($buffer, length)
+                 length = GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
+            if length == 0: raiseOSError(osLastError()) else: return ($buffer).replace(r"\\?\", "")
+        else: return expandSymlink path
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
@@ -372,16 +387,9 @@ when not defined(DirViewer):
         return organize().scroll_to(last_hl)
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
-        # Init setup.
         let prev_dir = path.extractFilename
-        ((if newdir.isAbsolute: newdir else: path / newdir).normalizedPath & DirSep).setCurrentDir
-        # Case correction.
-        var corrector: string = getCurrentDir().root_dir.capitalize
-        for parent in toSeq(getCurrentDir().parentDirs).reversed: # Case correction.
-            for real_name in walkPattern(parent/../parent.extractFilename): 
-                corrector = corrector / (real_name.extractFilename)
-        path = corrector
-        # Finalization.
+        ((if newdir.isAbsolute: newdir else: path / newdir).normalizedPath & DirSep).symlinkTarget.setCurrentDir
+        path = getCurrentDir()
         scroll_to(0).refresh()
         if newdir == ParDir: scroll_to_name(prev_dir) # Backtrace.
         return self
@@ -762,7 +770,7 @@ when not defined(FileViewer):
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
         # Analyzing loop.
-        for record in walkDir(path, checkDir = true): 
+        for record in walkDir(path.symlinkTarget, checkDir = true): 
             if record.path.dirExists: # Subdir registration.
                 subdirs.inc
                 if record.path.isHidden: hidden_dirs.inc
