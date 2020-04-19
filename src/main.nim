@@ -25,6 +25,7 @@ when not defined(Meta):
     template abort(reason = "")     = raise newException(abort_ex, reason)
     template control_down(): bool   = KEY_Left_Control.IsKeyDown()  or KEY_Right_Control.IsKeyDown()
     template shift_down(): bool     = KEY_Left_Shift.IsKeyDown()    or KEY_Right_Shift.IsKeyDown()
+    template alt_down(): bool       = KEY_Left_Alt.IsKeyDown()      or KEY_Right_Alt.IsKeyDown()
     template undot(ext: string): string                            = ext.runeSubstr((" " & ext).searchExtPos)
     template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
     template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0,size
