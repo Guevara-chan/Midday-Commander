@@ -113,6 +113,7 @@ when not defined(Meta):
         "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
         "\a\x07Ctrl+\a\x02F4-F7:\a\x01   sort entry list by name/extension/size/modification time ",
+        "\a\x07Ctrl+\a\x02Insert:\a\x01  store path to hilited entry into clipboard",
         "\a\x07Shift+\a\x02F3:\a\x01     view hilited entry in full",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
         "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
@@ -394,7 +395,7 @@ when not defined(DirViewer):
         return self
 
     proc exec(self: DirViewer, fname: string) =
-        openDefaultBrowser (path / self.hentry.name).quoteShell
+        openDefaultBrowser self.hpath.quoteShell
 
     proc invoke(self: DirViewer, entry: DirEntry) =
         if entry.is_dir: chdir(entry.name) else: exec(entry.name)
@@ -449,10 +450,11 @@ when not defined(DirViewer):
         elif MOUSE_Left_Button.IsMouseButtonDown:      # HL items if left button down.
             if pickindex != self.hline and pickindex < list.len: scroll_to pickindex
         # Kbd controls.
-        if KEY_UP.IsKeyDown:         (if norepeat(): scroll -1)
-        elif KEY_Down.IsKeyDown:     (if norepeat(): scroll 1)
-        elif KEY_Page_Up.IsKeyDown:  (if norepeat(): scroll -self.capacity)
-        elif KEY_Page_Down.IsKeyDown:(if norepeat(): scroll self.capacity)
+        if   KEY_Insert.IsKeyPressed and control_down(): self.hpath.SetClipboardText
+        elif KEY_UP.IsKeyDown:        (if norepeat(): scroll -1)
+        elif KEY_Down.IsKeyDown:      (if norepeat(): scroll 1)
+        elif KEY_Page_Up.IsKeyDown:   (if norepeat(): scroll -self.capacity)
+        elif KEY_Page_Down.IsKeyDown: (if norepeat(): scroll self.capacity)
         elif KEY_Left.IsKeyPressed:   scroll_to 0
         elif KEY_Right.IsKeyPressed:  scroll_to list.len
         elif KEY_Enter.IsKeyPressed:  invoke self.hentry
