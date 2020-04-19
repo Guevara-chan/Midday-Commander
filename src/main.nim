@@ -784,8 +784,13 @@ when not defined(FileViewer):
         let ext_sum = collect(newSeq): 
             for key,val in ext_table.pairs: (&"{key}: {val}").align_left(13,' '.Rune) & &"({(val/files.int*100):.2f}%)"
         # Finalization.
-        result = [&"Sum:: {path.convert(cmd_cp, getCurrentEncoding())}|", "=".repeat(path.runeLen + 6) & "/", "", 
-            &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
+        let
+            path_hdr = &"Sum:: {path.convert(cmd_cp, getCurrentEncoding())}"
+            link_hdr = &"Link\x1A {path.normalizePathEnd(true).symlinkTarget.convert(cmd_cp, getCurrentEncoding())}"
+            widest_hdr = max(path_hdr.len, link_hdr.len)
+        result = [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
+                if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
+            "=".repeat(widest_hdr) & "/", "", &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
             &"Sub-directories: {($subdirs).insertSep(' ', 3)} ({($hidden_dirs).insertSep(' ', 3)} hidden)",
             &"Files: {($files).insertSep(' ', 3)} ({($hidden_files).insertSep(' ', 3)} hidden)", ".".repeat(22),
             ext_sum.join("\n")
