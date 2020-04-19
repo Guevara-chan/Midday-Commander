@@ -258,7 +258,11 @@ when not defined(DirEntry):
         else: ""
 
     # --Methods goes here:    
-    proc `$`(self: DirEntry): string = (if self.is_dir: "/" elif self.executable: "*" else: " ") & name
+    proc `$`(self: DirEntry): string = 
+        result = if self.kind == pcLinkToDir: "~" elif self.kind == pcLinkToFile: "@"
+            elif self.is_dir: "/" elif self.executable: "*"
+            else: " "
+        return result & name
 
     proc get_desc(self: DirEntry): DirEntryDesc =
         if memo.id == "": ($self, self.metrics, self.time_stamp, self.coloring) else: memo
