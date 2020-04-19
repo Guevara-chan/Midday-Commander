@@ -259,8 +259,11 @@ when not defined(DirEntry):
 
     # --Methods goes here:    
     proc `$`(self: DirEntry): string = 
-        result = if self.kind == pcLinkToDir: "~" elif self.kind == pcLinkToFile: "@"
-            elif self.is_dir: "/" elif self.executable: "*"
+        result = case self.kind:
+            of pcLinkToDir: "~"
+            of pcLinkToFile: "@"
+            of pcDir: "/"
+            elif self.executable: "*"
             else: " "
         return result & name
 
@@ -759,7 +762,7 @@ when not defined(FileViewer):
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
         # Analyzing loop.
-        for record in walkDir(path, checkDir = false): 
+        for record in walkDir(path, checkDir = true): 
             if record.path.dirExists: # Subdir registration.
                 subdirs.inc
                 if record.path.isHidden: hidden_dirs.inc
@@ -774,7 +777,7 @@ when not defined(FileViewer):
         let ext_sum = collect(newSeq): 
             for key,val in ext_table.pairs: (&"{key}: {val}").align_left(13,' '.Rune) & &"({(val/files.int*100):.2f}%)"
         # Finalization.
-        result = [&"Sum:: {path}|", "=".repeat(path.runeLen + 6) & "/", "", 
+        result = [&"Sum:: {path.convert(cmd_cp, getCurrentEncoding())}|", "=".repeat(path.runeLen + 6) & "/", "", 
             &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
             &"Sub-directories: {($subdirs).insertSep(' ', 3)} ({($hidden_dirs).insertSep(' ', 3)} hidden)",
             &"Files: {($files).insertSep(' ', 3)} ({($hidden_files).insertSep(' ', 3)} hidden)", ".".repeat(22),
