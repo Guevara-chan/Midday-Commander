@@ -75,16 +75,15 @@ when not defined(Meta):
     proc symlinkTarget(path: string): string =
         when defined(windows):
             proc GetFinalPathNameByHandle(hFile:Handle, lpszFilePath:WideCStringObj, cchFilePath, dwFlags:int32):int32
-                {.stdcall, dynlib: "kernel32", importc: "GetFinalPathNameByHandleW".}
+                {.stdcall, dynlib: "kernel32", discardable, importc: "GetFinalPathNameByHandleW".}
             var
                 handle = createFileW(newWideCString(path), 0'i32, 0'i32, nil, OPEN_EXISTING, 
                     FILE_FLAG_BACKUP_SEMANTICS, 0)
-                buffer = newWideCString(" ".repeat(38))
-                length = GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
-            while length > len(buffer):
-                 buffer = newWideCString($buffer, length)
-                 length = GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
-            if length == 0: raiseOSError(osLastError()) else: return ($buffer).replace(r"\\?\", "")
+                length = GetFinalPathNameByHandle(handle, nil, 0, 0)
+            if length == 0: raiseOSError(osLastError())
+            let buffer = newWideCString(" ".repeat(length))
+            GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
+            return ($buffer).replace(r"\\?\", "")
         else: return expandSymlink path
 
     # --Data:
@@ -808,7 +807,8 @@ when not defined(FileViewer):
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
             close()
-            try: feed = if path.dirExists: dir_checkout(path).newStringStream() else: path.newFileStream fmRead
+            try: feed = if path.dirExists: dir_checkout(path).newStringStream() 
+                else: path.symlinkTarget.newFileStream fmRead
             except: discard # special case to not use handler to MultiViewer.
         src = path.absolutePath
 
