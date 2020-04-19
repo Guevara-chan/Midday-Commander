@@ -788,7 +788,7 @@ when not defined(FileViewer):
             path_hdr = &"Sum:: {path.convert(cmd_cp, getCurrentEncoding())}"
             link_hdr = &"Link\x1A {path.normalizePathEnd(true).symlinkTarget.convert(cmd_cp, getCurrentEncoding())}"
             widest_hdr = max(path_hdr.len, link_hdr.len)
-        result = [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
+        return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
             "=".repeat(widest_hdr) & "/", "", &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
             &"Sub-directories: {($subdirs).insertSep(' ', 3)} ({($hidden_dirs).insertSep(' ', 3)} hidden)",
