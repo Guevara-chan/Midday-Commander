@@ -61,23 +61,23 @@ when not defined(Meta):
             mask = pattern.splitFile
         return name.match_part(mask.name) and ext.undot.match_part(mask.ext.undot)
 
-    proc symlinkTarget(path: string): string =
+    proc truePath(path: string, follow_symlink = true): string =
         when defined(windows):
             proc GetFinalPathNameByHandle(hFile:Handle, lpszFilePath:WideCStringObj, cchFilePath, dwFlags:int32):int32
                 {.stdcall, dynlib: "kernel32", discardable, importc: "GetFinalPathNameByHandleW".}
             let
                 handle = createFileW(newWideCString(path), 0'i32, 0'i32, nil, OPEN_EXISTING, 
-                    FILE_FLAG_BACKUP_SEMANTICS, 0)
+                    FILE_FLAG_BACKUP_SEMANTICS or (FILE_FLAG_OPEN_REPARSE_POINT * (1-follow_symlink.int)), 0)
                 length = GetFinalPathNameByHandle(handle, nil, 0, 0)
                 buffer = newWideCString(" ".repeat(length))
-            if length == 0: raiseOSError(osLastError())
+            if length == 0: return path
             GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
             return ($buffer).replace(r"\\?\", "")
         else: return expandSymlink path
 
     # --Data:
     const help = @["\a\x03>\a\x01.",
-        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.06",
+        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.07",
         "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
         "===================================================================================",
         "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
@@ -259,7 +259,7 @@ when not defined(DirViewer):
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
         let prev_dir = path.extractFilename
-        ((if newdir.isAbsolute: newdir else: path / newdir).normalizedPath & DirSep).symlinkTarget.setCurrentDir
+        ((if newdir.isAbsolute: newdir else: path / newdir).normalizedPath & DirSep).truePath.setCurrentDir
         path = getCurrentDir()
         scroll_to(0).refresh()
         if newdir == ParDir: scroll_to_name(prev_dir) # Backtrace.
@@ -366,7 +366,7 @@ when not defined(DirViewer):
         host.write ["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
         # Entry fullname row rendering.
-        let target = if self.hentry.is_link: newDirEntry((kind: self.hentry.kind, path: self.hpath.symlinkTarget))
+        let target = if self.hentry.is_link: newDirEntry((kind: self.hentry.kind, path: self.hpath.truePath))
             else: self.hentry
         var 
             entry_id = $target
@@ -644,7 +644,7 @@ when not defined(FileViewer):
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
         # Analyzing loop.
-        for record in walkDir(path.normalizePathEnd(true).symlinkTarget, checkDir = true): 
+        for record in walkDir(path.normalizePathEnd(true).truePath, checkDir = true): 
             if record.path.dirExists: # Subdir registration.
                 subdirs.inc
                 if record.path.isHidden: hidden_dirs.inc
@@ -660,9 +660,8 @@ when not defined(FileViewer):
             for key,val in ext_table.pairs: (&"{key}: {val}").align_left(13,' '.Rune) & &"({(val/files.int*100):.2f}%)"
         # Finalization.
         let
-            fix_path = if path.symlinkExists: path else: path.normalizePathEnd(true).symlinkTarget # To fix C: 
-            path_hdr = &"Sum:: {(fix_path).convert(cmd_cp, getCurrentEncoding())}"
-            link_hdr = &"Link\x1A {path.normalizePathEnd(true).symlinkTarget.convert(cmd_cp, getCurrentEncoding())}"
+            path_hdr = &"Sum:: {(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, getCurrentEncoding())}"
+            link_hdr = &"Link\x1A {path.normalizePathEnd(true).truePath.convert(cmd_cp, getCurrentEncoding())}"
             widest_hdr = max(path_hdr.len, link_hdr.len)
         return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
@@ -689,7 +688,7 @@ when not defined(FileViewer):
         if force or path != src: 
             close()
             try: feed = if path.dirExists: dir_checkout(path).newStringStream() 
-                else: path.symlinkTarget.newFileStream fmRead
+                else: path.truePath.newFileStream fmRead
             except: discard # special case to not use handler to MultiViewer.
         src = path.absolutePath
 
