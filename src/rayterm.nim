@@ -9,7 +9,6 @@ when not defined(Area):
         lapse*:  int64
         repeater, clicker*: Time
 
-
     # --Methods goes here:
     method update*(self: Area): Area {.discardable base.} = discard
     method render*(self: Area): Area {.discardable base.} = discard
