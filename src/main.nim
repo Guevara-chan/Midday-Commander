@@ -660,8 +660,8 @@ when not defined(FileViewer):
             for key,val in ext_table.pairs: (&"{key}: {val}").align_left(13,' '.Rune) & &"({(val/files.int*100):.2f}%)"
         # Finalization.
         let
-            path_hdr = &"Sum:: {(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, getCurrentEncoding())}"
-            link_hdr = &"Link\x1A {path.normalizePathEnd(true).truePath.convert(cmd_cp, getCurrentEncoding())}"
+            path_hdr = &"Sum:: {(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}"
+            link_hdr = &"Link\x1A {path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}"
             widest_hdr = max(path_hdr.len, link_hdr.len)
         return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
