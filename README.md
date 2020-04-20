@@ -9,7 +9,7 @@ You can get `libraylib`.* binaries for your target platform here: https://github
 Compilation can be achieved through automated build script provided as `release.nims`.
 
 # •Featuræ•
-* Built-in HEX-viewer.
+* Built-in HEX file viewer.
 * Vintage control buttons scheme.
 * Full mouse support with drag/drop.
 * OpenGL-powered pseudographics in classical 16-colors palette.
