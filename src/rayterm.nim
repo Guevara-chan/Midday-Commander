@@ -22,9 +22,9 @@ when not defined(TerminalEmu):
         cur, cell:  Vector2
         fg, bg:     Color
         palette:    seq[Color]
-        dbginfo:    bool
         title:      string
         fps_table:  seq[int]
+        dbginfo, was_focused: bool
         margin*, min_width, min_height: int
 
     # --Properties.
@@ -32,6 +32,12 @@ when not defined(TerminalEmu):
     template vlines*(self: TerminalEmu): int = GetScreenHeight() div self.cell.y.int
     template hpos*(self: TerminalEmu): int = (self.cur.x / self.cell.x).int
     template vpos*(self: TerminalEmu): int = (self.cur.y / self.cell.y).int
+
+    proc focused(self: TerminalEmu): bool =
+        when defined(windows):
+            proc GetFocus(): pointer {.stdcall, dynlib: "user32", discardable, importc: "GetFocus".}
+            return GetFocus() == GetWindowHandle()
+        else: return true
 
     # --Methods goes here:
     proc loc_precise(self: TerminalEmu, x = 0, y = 0) =
@@ -96,6 +102,8 @@ when not defined(TerminalEmu):
         # Finalization.
         fps_table.add GetFPS()
         while fps_table.len > 60: fps_table.delete 0
+        if self.focused != self.was_focused: SetTargetFPS(if self.focused: 60 else: 5)
+        was_focused = self.focused
         SetWindowTitle(if dbginfo: &"{self.title} [fps: {min(fps_table)}~{max(fps_table)}]" else: title)
 
     proc loop_with*(self: TerminalEmu, areas: varargs[Area]) = 
