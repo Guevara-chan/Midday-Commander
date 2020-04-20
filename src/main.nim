@@ -254,6 +254,7 @@ when not defined(DirEntry):
     # --Properties:
     template executable(self: DirEntry): bool   = self.name.splitFile.ext.undot in ExeExts
     template is_dir(self: DirEntry): bool       = self.kind in [pcDir, pcLinkToDir]
+    template is_link(self: DirEntry): bool      = self.kind in [pcLinkToFile, pcLinkToDir]
 
     proc coloring(self: DirEntry): Color =
         result = case kind:
@@ -495,17 +496,19 @@ when not defined(DirViewer):
         host.write ["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
             border_color, DARKBLUE
         # Entry fullname row rendering.
+        let target = if self.hentry.is_link: newDirEntry((kind: self.hentry.kind, path: self.hpath.symlinkTarget))
+            else: self.hentry
         var 
-            entry_id = $hentry()
+            entry_id = $target
             ext = entry_id.splitFile.ext.undot
-        if ext != "" and ext.runeLen < total_width and not hentry().is_dir: # Adding separate extension cell.
+        if ext != "" and ext.runeLen < total_width and not target.is_dir: # Adding separate extension cell.
             entry_id = entry_id.changeFileExt ""
             let left_col = total_width - ext.runeLen - 1
             host.write [entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col: "…" else: "\u2192"],
-                hentry().coloring
-            host.write [ext, "\a\x01║\n"], hentry().coloring
+                target.coloring
+            host.write [ext, "\a\x01║\n"], target.coloring
         else: host.write [entry_id.fit_left(total_width), "\a\x01", if entry_id.runeLen>total_width:"…" else:"║","\n"],
-            hentry().coloring
+            target.coloring
         # 2nd footline rendering.
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
         let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
