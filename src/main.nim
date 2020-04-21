@@ -665,14 +665,14 @@ when not defined(FileViewer):
                 if record.path.isHidden: hidden_files.inc
                 ext_table.inc(record.path.splitFile.ext)
         # Extensions breakdown.
-        ext_table["<nil>"] = ext_table[""]
+        ext_table["\a\x05<nil>"] = ext_table[""]
         ext_table.del("")
         ext_table.sort()
         let ext_sum = collect(newSeq): 
             for key,val in ext_table.pairs: 
-                (&"{key}: \a\x06{val}\a\x00").align_left(17,' '.Rune) & &"(\a\x09{(val/files.int*100):.2f}%\a\x00)"
+                (&"\a\x05{key}\a\x00: \a\x06{val}\a\x00").replace(".", ".\a\x00").align_left(23,' '.Rune) & 
+                    &"(\a\x09{(val/files.int*100):.2f}%\a\x00)"
         # Finalization.
-        #RAYWHITE, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE
         let
             path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x05"
             link_hdr = &"Link\x1A \a\x09{path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}\a\x05"
