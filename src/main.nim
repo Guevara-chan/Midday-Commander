@@ -654,6 +654,7 @@ when not defined(FileViewer):
         var 
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
+        template by3(num: auto): string = ($num).insertSep(' ', 3)
         # Analyzing loop.
         for record in walkDir(path.normalizePathEnd(true).truePath, checkDir = true): 
             if record.path.dirExists: # Subdir registration.
@@ -668,17 +669,19 @@ when not defined(FileViewer):
         ext_table.del("")
         ext_table.sort()
         let ext_sum = collect(newSeq): 
-            for key,val in ext_table.pairs: (&"{key}: {val}").align_left(13,' '.Rune) & &"({(val/files.int*100):.2f}%)"
+            for key,val in ext_table.pairs: 
+                (&"{key}: \a\x06{val}\a\x00").align_left(17,' '.Rune) & &"(\a\x09{(val/files.int*100):.2f}%\a\x00)"
         # Finalization.
+        #RAYWHITE, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE
         let
             path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x00"
             link_hdr = &"Link\x1A \a\x09{path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}\a\x00"
             widest_hdr = max(path_hdr.len, link_hdr.len)
         return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
-            "=".repeat(widest_hdr - 4) & "/", "", &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
-            &"Sub-directories: {($subdirs).insertSep(' ', 3)} ({($hidden_dirs).insertSep(' ', 3)} hidden)",
-            &"Files: {($files).insertSep(' ', 3)} ({($hidden_files).insertSep(' ', 3)} hidden)", ".".repeat(22),
+            "=".repeat(widest_hdr-4) & "/", "", &"Surface data size: \a\x06{surf_size.by3}\a\x00 bytes", 
+            &"Sub-directories: \a\x06{subdirs.by3}\a\x00 (\a\x09{hidden_dirs.by3}\a\x00 hidden)",
+            &"Files: \a\x06{files.by3}\a\x00 (\a\x09{hidden_files.by3}\a\x00 hidden)", ".".repeat(22),
             ext_sum.join("\n")
         ].join("\n")
 
