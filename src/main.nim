@@ -259,7 +259,7 @@ when not defined(DirViewer):
 
     proc chdir(self: DirViewer, newdir: string): auto {.discardable.} =
         let prev_dir = path.extractFilename
-        ((if newdir.isAbsolute: newdir else: path / newdir).normalizedPath & DirSep).truePath.setCurrentDir
+        (if newdir.isAbsolute: newdir else: path / newdir).normalizePathEnd(true).truePath.setCurrentDir
         path = getCurrentDir()
         scroll_to(0).refresh()
         if newdir == ParDir: scroll_to_name(prev_dir) # Backtrace.
