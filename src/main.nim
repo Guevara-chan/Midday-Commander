@@ -673,10 +673,10 @@ when not defined(FileViewer):
         let
             path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x00"
             link_hdr = &"Link\x1A \a\x09{path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}\a\x00"
-            widest_hdr = max(path_hdr.len, link_hdr.len) - 4
+            widest_hdr = max(path_hdr.len, link_hdr.len)
         return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
-            "=".repeat(widest_hdr) & "/", "", &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
+            "=".repeat(widest_hdr - 4) & "/", "", &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
             &"Sub-directories: {($subdirs).insertSep(' ', 3)} ({($hidden_dirs).insertSep(' ', 3)} hidden)",
             &"Files: {($files).insertSep(' ', 3)} ({($hidden_files).insertSep(' ', 3)} hidden)", ".".repeat(22),
             ext_sum.join("\n")
