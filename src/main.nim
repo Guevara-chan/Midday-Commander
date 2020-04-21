@@ -1,6 +1,6 @@
 import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import std/with, winlean, threadpool, psutil, rayterm, raylib
+import std/with, winlean, threadpool, rayterm, raylib
 {.this: self.}
 
 #.{ [Classes]
