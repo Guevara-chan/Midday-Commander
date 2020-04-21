@@ -955,7 +955,7 @@ when not defined(MultiViewer):
         # Service proc.
         proc deleter(victim: string, is_dir: bool): ref Exception =
             try: 
-                if is_dir: victim.removeDir() else: victim.removeFile()
+                if is_dir: victim.removeDir(true) else: victim.removeFile()
             except: return getCurrentException()
         reset_watcher()
         # Deffered finalization.
@@ -1012,8 +1012,9 @@ when not defined(MultiViewer):
         cmdline.request "Input name for new directory", (name: string) => self.new_dir (name)
 
     proc request_deletion(self: MultiViewer) =
-        if self.active.selection_valid and 
-            warn(&"Are you sure want to delete {self.active.selected_entries.len} entris") >= 1: delete()
+        let target = if self.active.selected_entries.len > 1: &"{self.active.selected_entries.len} entris"
+            else: self.active.hentry.name.quoteShell
+        if self.active.selection_valid and warn(&"Are you sure want to delete {target}") >= 1: delete()
 
     proc request_sel_management(self: MultiViewer, new_state = true) =
         cmdline.request "Input " & (if new_state: "" else: "un") & "selection pattern \a\x03<*.*>", (pattern:string) =>
