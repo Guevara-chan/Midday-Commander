@@ -70,6 +70,7 @@ when not defined(Meta):
                     FILE_FLAG_BACKUP_SEMANTICS or (FILE_FLAG_OPEN_REPARSE_POINT * (1-follow_symlink.int)), 0)
                 length = GetFinalPathNameByHandle(handle, nil, 0, 0)
                 buffer = newWideCString(" ".repeat(length))
+            defer: discard closeHandle(handle)
             if length == 0: return path
             GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
             return ($buffer).replace(r"\\?\", "")
