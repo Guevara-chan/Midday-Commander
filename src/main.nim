@@ -532,7 +532,7 @@ when not defined(Alert):
             write [delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", " ".center(host.hlines), "\n\a\x03", 
                 "<Yes/No>".center(host.hlines), "\n\a\x08 ", delim], MAROON, BLACK
             loc((host.hlines - msg_len) div 2, self.ypos + 2)
-            write message.join("")
+            write message
         return self
 
     proc newAlert(term: TerminalEmu, creator: Area, msg: string): Alert =
@@ -567,7 +567,7 @@ when not defined(ProgressWatch):
         # Init setup.
         parent.render()
         if frameskip: frameskip = false; return self
-        if self.elapsed.inMilliseconds < 100: return self
+        #if self.elapsed.inMilliseconds < 100: return self
         # Timeline render.
         let midline = host.vlines div 2 - 1
         for y in 0..host.vlines-2: 
@@ -590,7 +590,7 @@ when not defined(ProgressWatch):
         return self
 
     proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
-        ProgressWatch(host: term, parent: creator, start: getTime())
+        ProgressWatch(host: term, parent: creator, start: getTime(), frameskip: true)
 # -------------------- #
 when not defined(FileViewer):
     type DataLine = tuple[origin: int, data: string]
@@ -1101,7 +1101,8 @@ when not defined(MultiViewer):
             if (getTime() - error.time).inSeconds > 2: error.msg = ""
         except: # Error message
             error = (msg: getCurrentExceptionMsg().splitLines[0], time: getTime())
-            for viewer in viewers: (if viewer.dirty: viewer.refresh().scroll_to(viewer.hline))
+            for viewer in viewers: (if viewer.dirty: viewer.refresh().scroll_to(viewer.hline))        
+        host.limit_fps(if host.focused: 60 else: 5)
         return self
 
     method render(self: MultiViewer): Area {.discardable.} =

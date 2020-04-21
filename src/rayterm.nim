@@ -1,6 +1,7 @@
 import os, strutils, times, sequtils, strformat, sugar, raylib
 from unicode import Rune, runes, runeLen, `==`, `$`
 {.this: self.}
+{.experimental.}
 
 #.{ [Classes]
 when not defined(Area):
@@ -24,8 +25,8 @@ when not defined(TerminalEmu):
         palette:    seq[Color]
         title:      string
         fps_table:  seq[int]
-        dbginfo, was_focused: bool
-        margin*, min_width, min_height: int
+        dbginfo:    bool
+        margin*, max_fps*, min_width, min_height: int
 
     # --Properties.
     template hlines*(self: TerminalEmu): int = GetScreenWidth() div self.cell.x.int
@@ -33,7 +34,7 @@ when not defined(TerminalEmu):
     template hpos*(self: TerminalEmu): int = (self.cur.x / self.cell.x).int
     template vpos*(self: TerminalEmu): int = (self.cur.y / self.cell.y).int
 
-    proc focused(self: TerminalEmu): bool =
+    proc focused*(self: TerminalEmu): bool =
         when defined(windows):
             proc GetFocus(): pointer {.stdcall, dynlib: "user32", discardable, importc: "GetFocus".}
             return GetFocus() == GetWindowHandle()
@@ -89,6 +90,10 @@ when not defined(TerminalEmu):
     proc adjust*(self: TerminalEmu) =
         resize self.hlines - self.hlines %% 2, self.vlines
 
+    proc limit_fps*(self: TerminalEmu, limit: int) =
+        if max_fps != limit: limit.SetTargetFPS
+        max_fps = limit
+
     proc update*(self: TerminalEmu, areas: varargs[Area]) =
         # Common controls.
         if IsWindowResized(): self.adjust()
@@ -102,8 +107,6 @@ when not defined(TerminalEmu):
         # Finalization.
         fps_table.add GetFPS()
         while fps_table.len > 60: fps_table.delete 0
-        if self.focused != self.was_focused: SetTargetFPS(if self.focused: 60 else: 5)
-        was_focused = self.focused
         SetWindowTitle(if dbginfo: &"{self.title} [fps: {min(fps_table)}~{max(fps_table)}]" else: title)
 
     proc loop_with*(self: TerminalEmu, areas: varargs[Area]) = 
@@ -113,7 +116,6 @@ when not defined(TerminalEmu):
         # Init setup.
         FLAG_WINDOW_RESIZABLE.uint32.SetConfigFlags
         InitWindow(880, 400, title)
-        60.SetTargetFPS
         0.SetExitKey
         getAppDir().setCurrentDir
         # Splash screen.
