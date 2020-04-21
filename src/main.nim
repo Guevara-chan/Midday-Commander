@@ -855,6 +855,7 @@ when not defined(MultiViewer):
     template next_viewer(self: MultiViewer): DirViewer  = self.viewers[self.next_index]
     template next_path(self: MultiViewer): string       = self.next_viewer.path
     template inspecting(self: MultiViewer): bool        = not inspector.isNil
+    template inspected_path(self: MultiViewer): string  = (if self.inspecting: self.inspector.src else: "")
     template previewing(self: MultiViewer): bool        = self.inspecting and not self.inspector.fullscreen
     template fullview(self: MultiViewer): bool          = self.inspecting and self.inspector.fullscreen
     template hint_prefix(self: MultiViewer): string     = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
@@ -968,6 +969,7 @@ when not defined(MultiViewer):
         for idx, entry in self.active.selected_entries:
             if entry.name != direxit.name: # No deletion for ..
                 let victim = self.active.path / entry.name
+                if self.inspected_path == victim: self.inspector.close()
                 wait_task spawn victim.deleter(entry.is_dir)
             else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
