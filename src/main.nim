@@ -1,6 +1,6 @@
 import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import std/with, winlean, threadpool, rayterm, raylib
+import std/with, winlean, threadpool, psutil, rayterm, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -599,7 +599,7 @@ when not defined(FileViewer):
         feed: Stream
         cache: seq[DataLine]
         src, lense_id: string
-        fullscreen, lense_switch: bool
+        fullscreen, lense_switch, hide_colors: bool
         x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     type FVControls = enum
@@ -671,9 +671,9 @@ when not defined(FileViewer):
             for key,val in ext_table.pairs: (&"{key}: {val}").align_left(13,' '.Rune) & &"({(val/files.int*100):.2f}%)"
         # Finalization.
         let
-            path_hdr = &"Sum:: {(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}"
-            link_hdr = &"Link\x1A {path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}"
-            widest_hdr = max(path_hdr.len, link_hdr.len)
+            path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x00"
+            link_hdr = &"Link\x1A \a\x09{path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}\a\x00"
+            widest_hdr = max(path_hdr.len, link_hdr.len) - 4
         return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
             "=".repeat(widest_hdr) & "/", "", &"Surface data size: {($surf_size).insertSep(' ', 3)} bytes", 
@@ -687,6 +687,7 @@ when not defined(FileViewer):
             feed.close()
             feed = nil
         src = ""
+        lense_id = ""
         cache.setLen 0
         char_total = 0
         widest_line = 0
@@ -695,11 +696,16 @@ when not defined(FileViewer):
         (last_line, feedsize) = (-1, -1)
         return self
 
+    proc pipe(self: FileViewer, text: string) =
+        close()
+        feed = text.newStringStream()
+        lense_id = "ANSI" 
+
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
             close()
-            try: feed = if path.dirExists: dir_checkout(path).newStringStream() 
-                else: path.truePath.newFileStream fmRead
+            try: 
+                if path.dirExists: pipe dir_checkout(path) else: feed = path.truePath.newFileStream fmRead
             except: discard # special case to not use handler to MultiViewer.
         src = path.absolutePath
 
@@ -722,16 +728,22 @@ when not defined(FileViewer):
     proc ascii_lense(self: FileViewer): iterator:string =
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
-        return iterator:string =
-            for line in fragment: yield line.data.subStr(x)
+        self.hide_colors = true
+        return iterator:string = (for line in fragment: yield line.data.subStr(x))
+
+    proc ansi_lense(self: FileViewer): iterator:string =
+        let feed = ascii_lense()
+        self.hide_colors = false
+        return iterator:string = (for line in feed: yield line.replace('\n', ' '))
 
     proc hex_lense(self: FileViewer): iterator:string =
         var 
             accum: seq[string]
             recap: seq[char]
             lines_left = self.vcap
+        self.hide_colors = true
         return iterator:string =
-            template row_out(sum = recap.join "") = yield accum.join("") & sum; lines_left.dec
+            template row_out(sum = recap.join "") = yield accum.join("") & sum; lines_left.dec # Aux tempalte.
             for chr in self.cached_chars(pos): 
                 accum.add &"{chr.int32:02X}" & # Smart delimiting.
                     (if accum.len == self.hexcap-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
@@ -764,7 +776,7 @@ when not defined(FileViewer):
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
-                    if lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
+                    if lense_id == "ANSI": lense_id elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
                     (last_line, feedsize) = (0, 0)
                     if lense_switch: "HEX" else: "ASCII"
@@ -819,7 +831,8 @@ when not defined(FileViewer):
             render_list = lenses[lense_id](self)
         for line in render_list(): with host:
             write if fullscreen: "" else: lborder
-            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=true
+            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=self.hide_colors
+            write if self.hide_colors: "" else: " ".repeat(line.count('\a') * 2)
             write if fullscreen: "\n" else: rborder, border_color
         # Footing render.
         if not fullscreen:  host.write "╘"
@@ -836,7 +849,8 @@ when not defined(FileViewer):
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
         result = FileViewer(host: term, xoffset: xoffset).close()
         type fix = proc (fv: FileViewer): iterator (): string{.closure.}{.closure.} # Siome compiler glitches.
-        result.lenses = {"ASCII": ascii_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
+        result.lenses = 
+            {"ASCII": ascii_lense.fix, "ANSI": ansi_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
         if src != "": result.open src
 
     proc destroy(self: FileViewer): FileViewer {.discardable.} =
@@ -1151,6 +1165,6 @@ when not defined(MultiViewer):
 when isMainModule:
     let 
         win = newTerminalEmu("Midday Commander", "res/midday.png", 110, 33,
-            BLACK, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE)
+            RAYWHITE, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win))
     win.loop_with supervisor
