@@ -417,6 +417,10 @@ when not defined(CommandLine):
     proc record(self: CommandLine, line: string) =
         log.add(line); scroll log.len
 
+    proc record(self: CommandLine, lines: seq[string]) =
+        for line in lines: log.add(line)
+        scroll log.len
+
     proc shell(self: CommandLine, cmd: string = "") =
         let command = (if cmd != "": cmd else: input)
         record(&"\a\x03>>\a\x04{command}")
@@ -570,7 +574,7 @@ when not defined(ProgressWatch):
             with host:
                 loc(host.hlines div 2 - 4 - decor.runeLen, y)
                 write decor, color, DarkBlue
-                write [border, &"{time.inHours:02}:{time.inMinutes:02}:{time.inSeconds:02}", border.reversed], 
+                write [border, &"{time.inHours:02}:{time.inMinutes%%60:02}:{time.inSeconds%%60:02}", border.reversed], 
                     color, Black
                 write decor.reversed, color, DarkBlue
         # Finalzation.
@@ -882,7 +886,7 @@ when not defined(MultiViewer):
 
     proc show_help(self: MultiViewer) =
         cmdline.fullscreen = true
-        for hint in help: cmdline.record(hint)
+        cmdline.record(help)
 
     proc navigate(self: MultiViewer, path: string) =
         discard self.active.chdir path
