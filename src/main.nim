@@ -939,7 +939,7 @@ when not defined(MultiViewer):
         else: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer
 
     proc copy(self: MultiViewer) =
-        sel_transfer(self, copyDir, copyFile)
+        if self.active.path != self.next_path: sel_transfer(self, copyDir, copyFile)
 
     proc move(self: MultiViewer, ren_pattern = "") =
         let src_viewer = self.active
