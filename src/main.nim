@@ -674,14 +674,14 @@ when not defined(FileViewer):
         # Finalization.
         #RAYWHITE, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE
         let
-            path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x00"
-            link_hdr = &"Link\x1A \a\x09{path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}\a\x00"
+            path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x05"
+            link_hdr = &"Link\x1A \a\x09{path.normalizePathEnd(true).truePath.convert(cmd_cp, \"UTF-8\")}\a\x05"
             widest_hdr = max(path_hdr.len, link_hdr.len)
         return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
-            "=".repeat(widest_hdr-4) & "/", "", &"Surface data size: \a\x06{surf_size.by3}\a\x00 bytes", 
+            "\a\x05" & "=".repeat(widest_hdr-4) & "/", "", &"Surface data size: \a\x06{surf_size.by3}\a\x00 bytes", 
             &"Sub-directories: \a\x06{subdirs.by3}\a\x00 (\a\x09{hidden_dirs.by3}\a\x00 hidden)",
-            &"Files: \a\x06{files.by3}\a\x00 (\a\x09{hidden_files.by3}\a\x00 hidden)", ".".repeat(22),
+            &"Files: \a\x06{files.by3}\a\x00 (\a\x09{hidden_files.by3}\a\x00 hidden)", "\a\x05" & ".".repeat(22),
             ext_sum.join("\n")
         ].join("\n")
 
