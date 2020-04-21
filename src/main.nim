@@ -497,8 +497,8 @@ when not defined(CommandLine):
 when not defined(Alert):
     type Alert = ref object of Area
         host:    TerminalEmu
-        message: string
-        answer:  int
+        message: seq[string]
+        answer, msg_len: int
 
     # --Properties:
     template ypos(self: Alert): int = host.vlines div 2 - 3
@@ -527,13 +527,19 @@ when not defined(Alert):
         parent.render()
         host.margin = 0
         let delim = "█ ".repeat host.hlines div 2
-        host.loc(0, self.ypos)        
-        host.write [delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", message.center(host.hlines), "\n\a\x03", 
-            "<Yes/No>".center(host.hlines), "\n\a\x08 ", delim], MAROON, BLACK
+        with host:
+            loc(0, self.ypos)        
+            write [delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", " ".center(host.hlines), "\n\a\x03", 
+                "<Yes/No>".center(host.hlines), "\n\a\x08 ", delim], MAROON, BLACK
+            loc((host.hlines - msg_len) div 2, self.ypos + 2)
+            write message.join("")
         return self
 
     proc newAlert(term: TerminalEmu, creator: Area, msg: string): Alert =
-        result = Alert(host: term, parent: creator, message: &"{msg} ?")
+        let msg_chunks = (&"{msg} ?").split('\n')
+        result = Alert(host: term, parent: creator, msg_len: msg_chunks.join("").runeLen)
+        result.message = collect(newSeq): # Decorated message chunks.
+            for idx, chunk in msg_chunks: "\a" & (if idx %% 2 == 0: '\x06' else: '\x09') & chunk
         try: result.host.loop_with result except: discard
 # -------------------- #
 when not defined(ProgressWatch):
@@ -901,7 +907,7 @@ when not defined(MultiViewer):
             except: return getCurrentException()
         # Actual transfer.
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
-            warn("Are you sure want to overwrite " & dest.extractFilename.quoteShell) > 0:
+            warn(&"Are you sure want to overwrite \n{dest.extractFilename}\n") > 0:
                 wait_task spawn src.transferrer(dest, dir_proc, file_proc)
                 return true
 
@@ -1015,8 +1021,8 @@ when not defined(MultiViewer):
         cmdline.request "Input name for new directory", (name: string) => self.new_dir (name)
 
     proc request_deletion(self: MultiViewer) =
-        let target = if self.active.selected_entries.len > 1: &"{self.active.selected_entries.len} entris"
-            else: self.active.hentry.name.quoteShell
+        let target = if self.active.selected_entries.len > 1: &"\n{self.active.selected_entries.len}\n entris"
+            else: &"\n{self.active.hentry.name}\n"
         if self.active.selection_valid and warn(&"Are you sure want to delete {target}") >= 1: delete()
 
     proc request_sel_management(self: MultiViewer, new_state = true) =
