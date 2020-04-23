@@ -121,7 +121,7 @@ when not defined(DirEntry):
         memo: DirEntryDesc
         selected, hidden: bool
     const direxit = DirEntry(name: ParDir, kind: pcDir)
-    const dirself = DirEntry(name: $CurDir, kind: pcDir)
+    const dirrepr = DirEntry(name: $CurDir, kind: pcDir)
 
     # --Properties:
     template executable(self: DirEntry): bool = self.name.splitFile.ext.undot in ExeExts
@@ -189,7 +189,7 @@ when not defined(DirViewer):
     template show_repr(self: DirViewer): bool  = self.active and KEY_Delete.IsKeyDown()
     template capacity(self: DirViewer): int    = host.vlines - hdr_height - foot_height - service_height
     template hindex(self: DirViewer): int      = hline - origin
-    template hentry(self: DirViewer): DirEntry = (if self.show_repr: dirself else: self.list[self.hline])
+    template hentry(self: DirViewer): DirEntry = (if self.show_repr: dirrepr else: self.list[self.hline])
     template hpath(self: DirViewer): string    = self.path / self.hentry.name
 
     proc path_limited(self: DirViewer): string = 
@@ -994,6 +994,7 @@ when not defined(MultiViewer):
             if entry.name != direxit.name: # No deletion for ..
                 let victim = self.active.path / entry.name
                 if self.inspected_path == victim: self.inspector.close()
+                if victim == getCurrentDir(): self.active.chdir direxit.name
                 wait_task spawn victim.deleter(entry.is_dir)
             else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
@@ -1040,7 +1041,7 @@ when not defined(MultiViewer):
 
     proc request_deletion(self: MultiViewer) =
         let target = if self.active.selected_entries.len > 1: &"\n{self.active.selected_entries.len}\n entris"
-            elif self.active.hentry.name == dirself.name: "\nthis\n dir"
+            elif self.active.hentry.name == dirrepr.name: "\nthis\n dir"
             else: &"\n{self.active.hentry.name}\n"
         if self.active.selection_valid and warn(&"Are you sure want to delete {target}") >= 1: delete()
 
