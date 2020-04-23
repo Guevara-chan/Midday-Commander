@@ -99,6 +99,7 @@ when not defined(Meta):
         "\a\x02Down:\a\x01   move selection/view 1 line down ",
         "\a\x02PgUp:\a\x01   move selection/view 1 page up",
         "\a\x02PgDown:\a\x01 move selection/view 1 page down",
+        "\a\x02Delete:\a\x01 hilight currently viewed dir (while pressed)",
         "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
         "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
