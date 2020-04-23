@@ -99,8 +99,8 @@ when not defined(Meta):
         "\a\x02Down:\a\x01   move selection/view 1 line down ",
         "\a\x02PgUp:\a\x01   move selection/view 1 page up",
         "\a\x02PgDown:\a\x01 move selection/view 1 page down",
-        "\a\x02Delete:\a\x01 hilight currently viewed dir (while pressed)",
         "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
+        "\a\x02Delete:\a\x01 hilight currently viewed dir (while pressed)",
         "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
         "\a\x07Ctrl+\a\x02F4-F7:\a\x01   sort entry list by name/extension/size/modification time ",
@@ -131,7 +131,7 @@ when not defined(DirEntry):
 
     proc coloring(self: DirEntry): Color =
         result = case kind:
-            of pcDir, pcLinkToDir: WHITE
+            of pcDir, pcLinkToDir: RAYWHITE
             of pcFile, pcLinkToFile:
                 if self.executable: GREEN else: BEIGE
         if hidden: result = result.Fade(0.7)
@@ -306,6 +306,13 @@ when not defined(DirViewer):
         else: new_criteria
         organize()
 
+    proc pick_sorter(self: DirViewer, x = GetMouseX(), y = GetMouseY()): SortCriteria =
+        if y == hdr_height - 1:
+            if x in viewer_width-date_col-1..viewer_width-2: return SortCriteria.mtime
+            elif x in name_col+2..viewer_width-date_col-2:   return SortCriteria.size
+            elif x in 1..name_col:                           return SortCriteria.name
+        return SortCriteria.default
+
     method update(self: DirViewer): Area {.discardable.} =
         # Init setup.
         hl_changed   = false
@@ -313,12 +320,15 @@ when not defined(DirViewer):
         if not active: return self
         scroll -GetMouseWheelMove()
         let
-            (x, y) = host.pick()
-            pickline = y - hdr_height
+            (x, y)    = host.pick()
+            pickline  = y - hdr_height
             pickindex = pickline + origin
-        if y < hdr_height or y >= host.vlines - service_height - foot_height: discard # Not service zone.
+            newsorter = pick_sorter(x, y)
+        if newsorter == SortCriteria.default and (y < hdr_height or y >= host.vlines - service_height - foot_height):
+            discard # Not service zone.
         elif MOUSE_Left_Button.IsMouseButtonReleased:  # Invoke item by double left click.
-            if (getTime()-clicker).inMilliseconds<=300: clicker = Time(); (if pickline == self.hindex: invoke hentry())
+            if newsorter != SortCriteria.default: switch_sorter newsorter
+            elif (getTime()-clicker).inMilliseconds<=300: clicker=Time(); (if pickline == self.hindex: invoke hentry())
             else: clicker = getTime()
         elif MOUSE_Right_Button.IsMouseButtonReleased: (if pickindex < list.len: switch_selection pickindex)# RB=select
         elif MOUSE_Left_Button.IsMouseButtonDown:      # HL items if left button down.
