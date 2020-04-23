@@ -121,11 +121,12 @@ when not defined(DirEntry):
         memo: DirEntryDesc
         selected, hidden: bool
     const direxit = DirEntry(name: ParDir, kind: pcDir)
+    const dirself = DirEntry(name: $CurDir, kind: pcDir)
 
     # --Properties:
-    template executable(self: DirEntry): bool   = self.name.splitFile.ext.undot in ExeExts
-    template is_dir(self: DirEntry): bool       = self.kind in [pcDir, pcLinkToDir]
-    template is_link(self: DirEntry): bool      = self.kind in [pcLinkToFile, pcLinkToDir]
+    template executable(self: DirEntry): bool = self.name.splitFile.ext.undot in ExeExts
+    template is_dir(self: DirEntry): bool     = self.kind in [pcDir, pcLinkToDir]
+    template is_link(self: DirEntry): bool    = self.kind in [pcLinkToFile, pcLinkToDir]
 
     proc coloring(self: DirEntry): Color =
         result = case kind:
@@ -185,10 +186,11 @@ when not defined(DirViewer):
         selected_color  = YELLOW
 
     # --Properties
-    template capacity(self: DirViewer): int     = host.vlines - hdr_height - foot_height - service_height
-    template hindex(self: DirViewer): int       = hline - origin
-    template hentry(self: DirViewer): DirEntry  = self.list[self.hline]
-    template hpath(self: DirViewer): string     = self.path / self.hentry.name
+    template show_repr(self: DirViewer): bool  = self.active and KEY_Delete.IsKeyDown()
+    template capacity(self: DirViewer): int    = host.vlines - hdr_height - foot_height - service_height
+    template hindex(self: DirViewer): int      = hline - origin
+    template hentry(self: DirViewer): DirEntry = (if self.show_repr: dirself else: self.list[self.hline])
+    template hpath(self: DirViewer): string    = self.path / self.hentry.name
 
     proc path_limited(self: DirViewer): string = 
         if path.runeLen > total_width-2: &"…{path.runeSubStr(-total_width+4)}"
@@ -208,7 +210,7 @@ when not defined(DirViewer):
     iterator render_list(self: DirViewer): tuple[index: int, val: DirEntry] =
             var fragment: seq[DirEntry] = list[origin..^1]
             fragment.setLen(self.capacity)
-            for idx, entry in fragment: yield (origin + idx, entry)
+            for idx, entry in fragment: yield (origin+idx, entry)
 
     # --Methods goes here:
     proc scroll_to(self: DirViewer, pos = 0): auto {.discardable.} =
@@ -323,7 +325,7 @@ when not defined(DirViewer):
             if pickindex != self.hline and pickindex < list.len: scroll_to pickindex
         # Kbd controls.
         if   KEY_Insert.IsKeyPressed and control_down(): self.hpath.SetClipboardText
-        elif KEY_UP.IsKeyDown:        (if norepeat(): scroll -1)
+        elif KEY_Up.IsKeyDown:        (if norepeat(): scroll -1)
         elif KEY_Down.IsKeyDown:      (if norepeat(): scroll 1)
         elif KEY_Page_Up.IsKeyDown:   (if norepeat(): scroll -self.capacity)
         elif KEY_Page_Down.IsKeyDown: (if norepeat(): scroll self.capacity)
@@ -359,7 +361,7 @@ when not defined(DirViewer):
             with host:
                 write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
                 write [desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
-                    if active and idx == hline: hl_color else: DARKBLUE # Highlight line.
+                    if active and idx == hline and not self.show_repr: hl_color else: DARKBLUE # Highlight line.
                 write [desc.metrics.fit(size_col), "\a\x01│"], text_color
                 write desc.time_stamp.fit_left(date_col), text_color
                 write ["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
@@ -378,8 +380,9 @@ when not defined(DirViewer):
             host.write [entry_id.fit_left(left_col),"\a\x01", if entry_id.runeLen>left_col: "…" else: "\u2192"],
                 target.coloring
             host.write [ext, "\a\x01║\n"], target.coloring
-        else: host.write [entry_id.fit_left(total_width), "\a\x01", if entry_id.runeLen>total_width:"…" else:"║","\n"],
-            target.coloring
+        else: 
+            host.write entry_id.fit_left(total_width), target.coloring, if self.show_repr: hl_color else: DARKBLUE
+            host.write [if entry_id.runeLen>total_width:"…" else:"║","\n"], border_color, DARKBLUE
         # 2nd footline rendering.
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
         let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
@@ -690,7 +693,6 @@ when not defined(FileViewer):
             feed.close()
             feed = nil
         src = ""
-        lense_id = ""
         cache.setLen 0
         char_total = 0
         widest_line = 0
@@ -700,9 +702,8 @@ when not defined(FileViewer):
         return self
 
     proc pipe(self: FileViewer, text: string) =
-        close()
+        close()        
         feed = text.newStringStream()
-        lense_id = "ANSI" 
 
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
@@ -779,7 +780,7 @@ when not defined(FileViewer):
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
-                    if lense_id == "ANSI": lense_id elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
+                    if feed of StringStream: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
                     (last_line, feedsize) = (0, 0)
                     if lense_switch: "HEX" else: "ASCII"
