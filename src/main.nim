@@ -924,6 +924,7 @@ when not defined(MultiViewer):
                 if src.dirExists: src.dir_proc(dest) else: src.file_proc(dest)
             except: return getCurrentException()
         # Actual transfer.
+        echo src, " ", dest
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn(&"Are you sure want to overwrite \n{dest.extractFilename}\n") > 0:
                 wait_task spawn src.transferrer(dest, dir_proc, file_proc)
@@ -945,7 +946,8 @@ when not defined(MultiViewer):
         for entry in self.active.selected_entries:
             if entry.name != direxit.name: # No transfer for ..
                 let src = self.active.path / entry.name
-                let dest = self.next_path / entry.name.wildcard_replace(if ren_pattern != "": ren_pattern else: "*.*")
+                let dest = self.next_path / src.extractFilename.wildcard_replace(
+                    if ren_pattern != "": ren_pattern else: "*.*")
                 if src != self.next_path and transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
                     self.next_viewer.dirty = true
                     if destructive: self.active.dirty = true
@@ -994,7 +996,7 @@ when not defined(MultiViewer):
             if entry.name != direxit.name: # No deletion for ..
                 let victim = self.active.path / entry.name
                 if self.inspected_path == victim: self.inspector.close()
-                if victim == getCurrentDir(): self.active.chdir direxit.name
+                if victim == self.active.path: self.active.chdir direxit.name
                 wait_task spawn victim.deleter(entry.is_dir)
             else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
