@@ -172,7 +172,7 @@ when not defined(DirViewer):
         path: string
         list: seq[DirEntry]
         dir_stat, sel_stat: BreakDown
-        dirty, active, visible, hl_changed, inverse_sort: bool
+        dirty, active, visible, hl_changed, inverse_sort, show_repr: bool
         hline, origin, xoffset, file_count, name_col, size_col, date_col, total_width, viewer_width: int
         sorters: seq[proc(x: DirEntry, y: DirEntry): int]
         sorter: SortCriteria
@@ -186,7 +186,6 @@ when not defined(DirViewer):
         selected_color  = YELLOW
 
     # --Properties
-    template show_repr(self: DirViewer): bool  = self.active and KEY_Delete.IsKeyDown()
     template capacity(self: DirViewer): int    = host.vlines - hdr_height - foot_height - service_height
     template hindex(self: DirViewer): int      = hline - origin
     template hentry(self: DirViewer): DirEntry = (if self.show_repr: dirrepr else: self.list[self.hline])
@@ -324,6 +323,7 @@ when not defined(DirViewer):
         elif MOUSE_Left_Button.IsMouseButtonDown:      # HL items if left button down.
             if pickindex != self.hline and pickindex < list.len: scroll_to pickindex
         # Kbd controls.
+        self.show_repr = KEY_Delete.IsKeyDown()
         if   KEY_Insert.IsKeyPressed and control_down(): self.hpath.SetClipboardText
         elif KEY_Up.IsKeyDown:        (if norepeat(): scroll -1)
         elif KEY_Down.IsKeyDown:      (if norepeat(): scroll 1)
