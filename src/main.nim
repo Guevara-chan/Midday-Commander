@@ -1040,6 +1040,7 @@ when not defined(MultiViewer):
 
     proc request_deletion(self: MultiViewer) =
         let target = if self.active.selected_entries.len > 1: &"\n{self.active.selected_entries.len}\n entris"
+            elif self.active.hentry.name == dirself.name: "\nthis\n dir"
             else: &"\n{self.active.hentry.name}\n"
         if self.active.selection_valid and warn(&"Are you sure want to delete {target}") >= 1: delete()
 
