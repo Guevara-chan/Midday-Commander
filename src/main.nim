@@ -77,10 +77,10 @@ when not defined(Meta):
         else: return expandSymlink path
 
     # --Data:
-    const help = @["\a\x03>\a\x01.",
+    const help = @[
         "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.07",
         "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
-        "===================================================================================",
+        "\a\x01===================================================================================",
         "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
         "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
         "\a\x02F3:\a\x01     switch preview mode on/off",
@@ -613,7 +613,7 @@ when not defined(FileViewer):
         feed: Stream
         cache: seq[DataLine]
         src, lense_id: string
-        fullscreen, lense_switch, hide_colors: bool
+        fullscreen, lense_switch, hide_colors, night: bool
         x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
     type FVControls = enum
@@ -704,6 +704,7 @@ when not defined(FileViewer):
             feed.close()
             feed = nil
         src = ""
+        night = false
         cache.setLen 0
         char_total = 0
         widest_line = 0
@@ -712,8 +713,9 @@ when not defined(FileViewer):
         (last_line, feedsize) = (-1, -1)
         return self
 
-    proc pipe(self: FileViewer, text: string) =
-        close()        
+    proc pipe(self: FileViewer, text: string, title = "") =
+        close()
+        src = title
         feed = text.newStringStream()
 
     proc open(self: FileViewer, path: string, force = false) =
@@ -771,12 +773,14 @@ when not defined(FileViewer):
             if accum.len > 0: row_out ' '.repeat(self.hexcap*cell-accum.len*cell-1) & "\xBA" & recap.join ""
             for exceed in 1..lines_left: yield ""
 
-    proc cycle_lenses(self: FileViewer) =
+    proc cycle_lenses(self: FileViewer): FileViewer {.discardable.}  =
         lense_switch = not lense_switch
+        return self
 
-    proc switch_fullscreen(self: FileViewer, new_state = -1) =
+    proc switch_fullscreen(self: FileViewer, new_state = -1): FileViewer {.discardable.} =
         fullscreen = if new_state == -1: not fullscreen else: new_state.bool
         vscroll(); hscroll()
+        return self
 
     method update(self: FileViewer): Area {.discardable.} =
         # Deffered data update.
@@ -825,7 +829,7 @@ when not defined(FileViewer):
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
         host.margin = self.margin
-        let main_bg = DARKBLUE.Fade 0.7
+        let main_bg = if self.night: BLACK else: DARKBLUE.Fade 0.7
         proc write_centered(text: string, color: Color) =
             host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
             host.write @[" ", text, " "], color, DARKGRAY
@@ -835,9 +839,10 @@ when not defined(FileViewer):
             write if fullscreen: "═" else: "╒", border_color, main_bg
             write [" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
             write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, main_bg
-            write (if fullscreen: "\x10│\x11" else: "╡↔╞"), Gold, DARKGRAY
+            write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
             write [if fullscreen: "═" else: "╕", ""], border_color, main_bg
-        if self.feed_avail and (y>0 or x>0 or fullscreen): write_centered &"{y}:{x} /off={pos:X}", PURPLE
+        if self.feed_avail and (y>0 or x>0 or fullscreen): # Locations hint.
+            write_centered &"{y}:{x}" & (if lense_id == "ANSI": "" else: &"/off={pos:X}"), PURPLE
         host.write "\n", border_color, main_bg
         # Rendering loop.
         let 
@@ -851,11 +856,11 @@ when not defined(FileViewer):
             write if fullscreen: "\n" else: rborder, border_color
         # Footing render.
         if not fullscreen:  host.write "╘"
-        elif x>0:           host.write "\x11", Gold, DARKGRAY
+        elif x>0:           host.write "\x11", GOLD, DARKGRAY
         else:               host.write "═"
         host.write "═".repeat(self.hcap - fullscreen.int * 2), border_color, main_bg
         if not fullscreen:  host.write "╛"
-        elif x<self.right_edge: host.write "\x10", Gold, DARKGRAY
+        elif x<self.right_edge: host.write "\x10", GOLD, DARKGRAY
         else:               host.write "═"
         write_centered self.caption_limited, (if self.feed_avail: Orange else: Maroon)
         # Finalization.
@@ -921,10 +926,6 @@ when not defined(MultiViewer):
         if not watcher.isNil: watcher.frameskip = true
         return newAlert(host, self, message).answer
 
-    proc show_help(self: MultiViewer) =
-        cmdline.fullscreen = true
-        cmdline.record(help)
-
     proc navigate(self: MultiViewer, path: string) =
         discard self.active.chdir path
 
@@ -970,13 +971,22 @@ when not defined(MultiViewer):
     proc uninspect(self: MultiViewer) =
         if self.inspecting: inspector = inspector.destroy()
 
-    proc inspect(self: MultiViewer) =
+    proc inspect(self: MultiViewer): FileViewer {.discardable.} =
         let 
             target = self.active.hentry
             path = self.active.path / self.active.hentry.name
         if self.inspecting: inspector.open path                               # Reusing existing fileviewer
         else: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer
+        return inspector
 
+    proc inspect(self: MultiViewer, text: string, title: string): FileViewer {.discardable.} =
+        if not self.inspecting: inspector = newFileViewer(host, self.next_viewer.xoffset)
+        inspector.pipe(text, title)
+        return inspector
+
+    proc show_help(self: MultiViewer) =
+        inspect(help.join("\n"), "@HELP").switch_fullscreen(1).night = true
+        
     proc copy(self: MultiViewer) =
         if self.active.path != self.next_path: sel_transfer(self, copyDir, copyFile)
 
