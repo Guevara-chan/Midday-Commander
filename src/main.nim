@@ -108,8 +108,8 @@ when not defined(Meta):
         "\a\x07Shift+\a\x02F3:\a\x01     view hilited entry in full",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
         "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
-        "\a\x07Numpad|\a\x02+:\a\x01     reqest pattern for mass selection in current dir",
-        "\a\x07Numpad|\a\x02-:\a\x01     reqest pattern for mass deselection in current dir",
+        "\a\x07Numpad|\a\x02+:\a\x01     request pattern for mass selection in current dir",
+        "\a\x07Numpad|\a\x02-:\a\x01     request pattern for mass deselection in current dir",
         "==================================================================================="]
 # -------------------- #
 when not defined(DirEntry):
@@ -613,6 +613,7 @@ when not defined(FileViewer):
         feed: Stream
         cache: seq[DataLine]
         src, lense_id: string
+        walker: iterator:string
         fullscreen, lense_switch, hide_colors, night: bool
         x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
@@ -668,6 +669,7 @@ when not defined(FileViewer):
         var 
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
+        
         template by3(num: auto): string = ($num).insertSep(' ', 3)
         # Analyzing loop.
         for record in walkDir(path.normalizePathEnd(true).truePath, checkDir = true): 
@@ -678,6 +680,12 @@ when not defined(FileViewer):
                 files.inc; surf_size += record.path.getFileSize
                 if record.path.isHidden: hidden_files.inc
                 ext_table.inc(record.path.splitFile.ext)
+        # Deep analyzing prearations.
+        walker = iterator:string = 
+            var total_size: BiggestInt
+            for file in walkDirRec(path):
+                total_size += file.getFileSize
+                yield file
         # Extensions breakdown.
         ext_table["\a\x05<nil>"] = ext_table[""]
         ext_table.del("")
@@ -685,7 +693,7 @@ when not defined(FileViewer):
         let ext_sum = collect(newSeq): 
             for key,val in ext_table.pairs: 
                 (&"\a\x05{key}\a\x00: \a\x06{val}\a\x00").replace(".", ".\a\x00").align_left(23,' '.Rune) & 
-                    &"(\a\x09{(val/files.int*100):.2f}%\a\x00)"
+                    &"(\a\x09{(val/files.int*100):.2f}%\a\x00)"               
         # Finalization.
         let
             path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x05"
@@ -704,6 +712,7 @@ when not defined(FileViewer):
             feed.close()
             feed = nil
         src = ""
+        walker = nil
         night = false
         cache.setLen 0
         char_total = 0
@@ -746,12 +755,12 @@ when not defined(FileViewer):
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
         self.hide_colors = true
-        return iterator:string = (for line in fragment: yield line.data.subStr(x))
+        return iterator:string = (for line in fragment: yield line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:string =
         let feed = ascii_lense()
         self.hide_colors = false
-        return iterator:string = (for line in feed: yield line.replace('\n', ' '))
+        return iterator:string = (for line in feed: yield line.dup(removeSuffix('\n')))
 
     proc hex_lense(self: FileViewer): iterator:string =
         var 
@@ -800,6 +809,11 @@ when not defined(FileViewer):
                     (last_line, feedsize) = (0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
+        # Deep analyzis.
+        if walker != nil:
+            let start = getTime()
+            for fname in walker:
+                if (getTime() - start).inMilliseconds > 50: break
         # Mouse controls.
         if self.active:
             vscroll -GetMouseWheelMove()
@@ -833,6 +847,8 @@ when not defined(FileViewer):
         proc write_centered(text: string, color: Color) =
             host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
             host.write @[" ", text, " "], color, DARKGRAY
+        template fit_left_ex(txt: string, size: int): string =
+            txt.alignLeft(size, ' ').subStr 0, size
         # Header render.
         with host:
             loc(self.margin, 0)
@@ -849,11 +865,12 @@ when not defined(FileViewer):
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
             render_list = lenses[lense_id](self)
-        for line in render_list(): with host:
-            write if fullscreen: "" else: lborder
-            write line.convert(srcEncoding = cmd_cp).fit_left(self.hcap), RayWhite, raw=self.hide_colors
-            write if self.hide_colors: "" else: " ".repeat(line.count('\a') * 2)
-            write if fullscreen: "\n" else: rborder, border_color
+        for line in render_list(): 
+            let len_shift = if self.hide_colors: 0 else: line.count('\a') * 2
+            with host:
+                write if fullscreen: "" else: lborder
+                write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), RayWhite, raw=self.hide_colors
+                write if fullscreen: "\n" else: rborder, border_color
         # Footing render.
         if not fullscreen:  host.write "╘"
         elif x>0:           host.write "\x11", GOLD, DARKGRAY
@@ -984,9 +1001,7 @@ when not defined(MultiViewer):
         inspector.pipe(text, title)
         return inspector
 
-    proc show_help(self: MultiViewer) =
-        inspect(help.join("\n"), "@HELP").switch_fullscreen(1).night = true
-        
+       
     proc copy(self: MultiViewer) =
         if self.active.path != self.next_path: sel_transfer(self, copyDir, copyFile)
 
@@ -1036,6 +1051,9 @@ when not defined(MultiViewer):
             if transfer(src, self.active.path / src.extractFilename, copyDir, copyFile): 
                 last_transferred = src.extractFilename
                 self.active.dirty = true
+
+    proc show_help(self: MultiViewer) =
+        inspect(help.join("\n"), "@HELP").switch_fullscreen(1).night = true
 
     proc switch_inspector(self: MultiViewer) =
         if self.inspecting: uninspect() else: inspect()
