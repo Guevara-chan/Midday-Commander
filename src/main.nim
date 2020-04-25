@@ -581,7 +581,7 @@ when not defined(ProgressWatch):
         # Init setup.
         parent.render()
         if frameskip: frameskip = false; return self
-        #if self.elapsed.inMilliseconds < 100: return self
+        if self.elapsed.inMilliseconds < 100: return self
         # Timeline render.
         let midline = host.vlines div 2 - 1
         for y in 0..host.vlines-2: 
@@ -1142,13 +1142,13 @@ when not defined(MultiViewer):
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
                 # File viewer update.
-                if self.previewing:
-                    inspector.xoffset = self.next_viewer.xoffset
-                    if self.active.hl_changed: inspect()
-                if self.inspecting: # Update using timing info.
-                    let start = getTime()
-                    inspector.update()
-                    self.active.lapse = (getTime() - start).inMilliseconds
+                let start = getTime()
+                if self.inspecting:
+                    if self.previewing:
+                        inspector.xoffset = self.next_viewer.xoffset
+                        if self.active.hl_changed: inspect()
+                    inspector.update()                    
+                self.active.lapse = (getTime() - start).inMilliseconds
                 # Viewer update.
                 self.active.update()
                 if dirty:
