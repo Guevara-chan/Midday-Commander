@@ -695,12 +695,18 @@ when not defined(FileViewer):
                 ext_table.inc(record.path.splitFile.ext)
         # Deep analyzing prearations.
         walker = iterator: BiggestInt =
-            var total_size: BiggestInt
+            var 
+                total_size, total_files, total_dirs: BiggestInt
             for dir in lazy_xtree(path.normalizePathEnd(true).truePath):
-                for file in walkFiles(dir / "*"): total_size += file.getFileSize
+                for file in walkFiles(dir / "*"): total_size += file.getFileSize; total_files.inc
+                total_dirs.inc
                 yield total_size
-            cache.add((0, block_sep))
-            cache.add((0, &"Total data size: \a\x06{total_size.by3}\a\x00 bytes"))
+            let last_pos = feed.getPosition
+            if ext_table.len > 0: feed.writeLine(block_sep)
+            feed.writeLine(&"Total data size: \a\x06{total_size.by3}\a\x00 bytes")
+            feed.writeLine(&"Total sub-directories: \a\x06{(total_dirs-1).by3}")
+            feed.writeLine(&"Total files: \a\x06{total_files.by3}")
+            feed.setPosition last_pos
         # Extensions breakdown.
         ext_table["\a\x05<nil>"] = ext_table[""]
         ext_table.del("")
