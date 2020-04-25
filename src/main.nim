@@ -76,6 +76,18 @@ when not defined(Meta):
             return ($buffer).replace(r"\\?\", "")
         else: return expandSymlink path
 
+    iterator lazy_xtree(path: string): string =
+        var 
+            checklist = @[path]
+            volatile: seq[string]
+        while checklist.len > 0:
+            for src in checklist:
+                yield src
+                for dir in walkDirs(src / "*"): volatile.add dir
+            checklist.setLen 0
+            checklist.add volatile
+            volatile.setLen 0
+
     # --Data:
     const help = @[
         "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.07",
@@ -613,7 +625,7 @@ when not defined(FileViewer):
         feed: Stream
         cache: seq[DataLine]
         src, lense_id: string
-        walker: iterator:string
+        walker: iterator:BiggestInt
         fullscreen, lense_switch, hide_colors, night: bool
         x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator ():string]
@@ -632,6 +644,7 @@ when not defined(FileViewer):
     template hexcells(self: FileViewer): int     = self.hexcap * self.vcap
     template right_edge(self: FileViewer): int   = widest_line - self.hcap
     template margin(self: FileViewer): int       = xoffset * (not self.fullscreen).int
+    template data_piped(self: FileViewer): bool  = feed of StringStream
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
     template active(self: FileViewer): bool      = self.fullscreen
@@ -669,7 +682,7 @@ when not defined(FileViewer):
         var 
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
-        
+        const block_sep = "\a\x05" & ".".repeat(22)
         template by3(num: auto): string = ($num).insertSep(' ', 3)
         # Analyzing loop.
         for record in walkDir(path.normalizePathEnd(true).truePath, checkDir = true): 
@@ -681,11 +694,13 @@ when not defined(FileViewer):
                 if record.path.isHidden: hidden_files.inc
                 ext_table.inc(record.path.splitFile.ext)
         # Deep analyzing prearations.
-        walker = iterator:string = 
+        walker = iterator: BiggestInt =
             var total_size: BiggestInt
-            for file in walkDirRec(path):
-                total_size += file.getFileSize
-                yield file
+            for dir in lazy_xtree(path.normalizePathEnd(true).truePath):
+                for file in walkFiles(dir / "*"): total_size += file.getFileSize
+                yield total_size
+            cache.add((0, block_sep))
+            cache.add((0, &"Total data size: \a\x06{total_size.by3}\a\x00 bytes"))
         # Extensions breakdown.
         ext_table["\a\x05<nil>"] = ext_table[""]
         ext_table.del("")
@@ -703,8 +718,7 @@ when not defined(FileViewer):
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
             "\a\x05" & "=".repeat(widest_hdr-4) & "/", "", &"Surface data size: \a\x06{surf_size.by3}\a\x00 bytes", 
             &"Sub-directories: \a\x06{subdirs.by3}\a\x00 (\a\x09{hidden_dirs.by3}\a\x00 hidden)",
-            &"Files: \a\x06{files.by3}\a\x00 (\a\x09{hidden_files.by3}\a\x00 hidden)", "\a\x05" & ".".repeat(22),
-            ext_sum.join("\n")
+            &"Files: \a\x06{files.by3}\a\x00 (\a\x09{hidden_files.by3}\a\x00 hidden)", block_sep, ext_sum.join("\n")
         ].join("\n")
 
     proc close(self: FileViewer): FileViewer {.discardable.} =
@@ -723,7 +737,7 @@ when not defined(FileViewer):
         return self
 
     proc pipe(self: FileViewer, text: string, title = "") =
-        close()
+        #close()
         src = title
         feed = text.newStringStream()
 
@@ -804,16 +818,16 @@ when not defined(FileViewer):
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
-                    if feed of StringStream: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
+                    if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
                     (last_line, feedsize) = (0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
-        # Deep analyzis.
-        if walker != nil:
-            let start = getTime()
-            for fname in walker:
-                if (getTime() - start).inMilliseconds > 50: break
+            # Deep analyzis.
+            if walker != nil:
+                let start = getTime()
+                for checkpoint in walker:
+                    if (getTime() - start).inMilliseconds > 50: break
         # Mouse controls.
         if self.active:
             vscroll -GetMouseWheelMove()
@@ -856,7 +870,7 @@ when not defined(FileViewer):
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
             write [if fullscreen: "═" else: "╕", ""], border_color, main_bg
         if self.feed_avail and (y>0 or x>0 or fullscreen): # Locations hint.
-            write_centered &"{y}:{x}" & (if lense_id == "ANSI": "" else: &"/off={pos:X}"), PURPLE
+            write_centered &"{y}:{x}" & (if self.data_piped: "" else: &"/off={pos:X}"), PURPLE
         host.write "\n", border_color, main_bg
         # Rendering loop.
         let 
@@ -1206,7 +1220,7 @@ when not defined(MultiViewer):
 #.}
 
 # ==Main code==
-when isMainModule:
+when isMainModule:    
     let 
         win = newTerminalEmu("Midday Commander", "res/midday.png", 110, 33,
             RAYWHITE, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE)
