@@ -118,6 +118,7 @@ when not defined(Meta):
         "\a\x07Ctrl+\a\x02F4-F7:\a\x01   sort entry list by name/extension/size/modification time ",
         "\a\x07Ctrl+\a\x02Insert:\a\x01  store path to hilited entry into clipboard",
         "\a\x07Shift+\a\x02F3:\a\x01     view hilited entry in full",
+        "\a\x07Shift+\a\x02F7:\a\x01     request symlink creation for hilited entry",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
         "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
         "\a\x07Numpad|\a\x02+:\a\x01     request pattern for mass selection in current dir",
@@ -661,7 +662,7 @@ when not defined(FileViewer):
     proc picked_control(self: FileViewer): FVControls =
         let (x, y) = host.pick()
         if y == 0: # Headerline
-            if x in self.margin+2..self.margin+3+lense_id.runeLen:
+            if x in self.margin+1..self.margin+2+lense_id.runeLen:
                 return FVControls.lense
             if x+fullscreen.int*border_shift in self.margin+self.hcap-"╡↔╞".runeLen+1..self.margin+self.hcap:
                 return FVControls.minmax
@@ -1032,6 +1033,12 @@ when not defined(MultiViewer):
         self.active.refresh.scroll_to_name name
         sync self.active
 
+    proc new_link(self: MultiViewer, name: string) =
+        if self.active.hentry.name != direxit.name:
+            self.active.path.joinPath(self.active.hentry.name).createSymlink self.active.path / name
+            self.active.refresh.scroll_to_name name
+            sync self.active
+
     proc delete(self: MultiViewer) =
         # Service proc.
         proc deleter(victim: string, is_dir: bool): ref Exception =
@@ -1095,7 +1102,11 @@ when not defined(MultiViewer):
             cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
 
     proc request_new_dir(self: MultiViewer) =
-        cmdline.request "Input name for new directory", (name: string) => self.new_dir (name)
+        cmdline.request "Input name for new directory", (name: string) => self.new_dir name
+
+    proc request_new_link(self: MultiViewer) =
+        if self.active.selection_valid:
+            cmdline.request "Input name for new link", (name: string) => self.new_link name
 
     proc request_deletion(self: MultiViewer) =
         let target = if self.active.selected_entries.len > 1: &"\n{self.active.selected_entries.len}\n entris"
@@ -1146,6 +1157,7 @@ when not defined(MultiViewer):
                 # Hint controls (shift+).
                 elif shift_down():
                     if   f_key==3 or KEY_F3.IsKeyPressed: switch_inspector_fs()
+                    elif f_key==7 or KEY_F7.IsKeyPressed: request_new_link()
                 # Hint controls (vanilla).
                 else:
                     if   f_key==1 or KEY_F1.IsKeyPressed:   show_help()
@@ -1203,8 +1215,8 @@ when not defined(MultiViewer):
             host.loc(self.hint_margin, host.vpos)
             let (hint_line, enabled) = if control_down(): (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
-                elif shift_down():                        (" | |\x11View\x10| | | | | | | ",
-                                                          @[3])
+                elif shift_down():                        (" | |\x11View\x10| | | |MkLink| | | ",
+                                                          @[3, 7])
                 else:                                     ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
                                                           @[1, 3, 5, 6, 7, 8, 10])
             for hint in hint_line.split("|"):
