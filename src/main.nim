@@ -692,8 +692,8 @@ when not defined(FileViewer):
         ext_table.sort()
         let ext_sum = collect(newSeq): 
             for key,val in ext_table.pairs: 
-                (&"\a\x05{key}\a\x00: \a\x06{val}\a\x00").replace(".", ".\a\x00").align_left(23,' '.Rune) & 
-                    &"(\a\x09{(val/files.int*100):.2f}%\a\x00)"               
+                (&"\a\x05{key}\a\x00: \a\x06{val}\a\x00").replace(".", ".\a\x00").align_left(22,' '.Rune) & 
+                    &" (\a\x09{(val/files.int*100):.2f}%\a\x00)"               
         # Finalization.
         let
             path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x05"
@@ -847,8 +847,6 @@ when not defined(FileViewer):
         proc write_centered(text: string, color: Color) =
             host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
             host.write @[" ", text, " "], color, DARKGRAY
-        template fit_left_ex(txt: string, size: int): string =
-            txt.alignLeft(size, ' ').subStr 0, size
         # Header render.
         with host:
             loc(self.margin, 0)
@@ -866,7 +864,7 @@ when not defined(FileViewer):
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
             render_list = lenses[lense_id](self)
         for line in render_list(): 
-            let len_shift = if self.hide_colors: 0 else: line.count('\a') * 2
+            let len_shift = if self.hide_colors: 0 else: line.subStr(0, min(self.hcap, line.len)).count('\a') * 2
             with host:
                 write if fullscreen: "" else: lborder
                 write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), RayWhite, raw=self.hide_colors
