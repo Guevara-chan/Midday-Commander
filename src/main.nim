@@ -694,13 +694,13 @@ when not defined(FileViewer):
                 if record.path.isHidden: hidden_files.inc
                 ext_table.inc(record.path.splitFile.ext)
         # Deep analyzing prearations.
-        walker = iterator: BiggestInt =
+        if subdirs > 0: walker = iterator: BiggestInt =
             var 
                 total_size, total_files, total_dirs: BiggestInt
             for dir in lazy_xtree(path.normalizePathEnd(true).truePath):
-                for file in walkFiles(dir / "*"): total_size += file.getFileSize; total_files.inc
-                total_dirs.inc
-                yield total_size
+                let files = toSeq(walkFiles(dir / "*"))
+                for file in files: total_size += file.getFileSize; total_files.inc; yield total_size
+                total_dirs.inc                
             let last_pos = feed.getPosition
             if ext_table.len > 0: feed.writeLine(block_sep)
             feed.writeLine(&"Total data size: \a\x06{total_size.by3}\a\x00 bytes")
@@ -731,8 +731,8 @@ when not defined(FileViewer):
         if self.feed_avail:
             feed.close()
             feed = nil
+            walker = nil
         src = ""
-        walker = nil
         night = false
         cache.setLen 0
         char_total = 0
@@ -743,7 +743,7 @@ when not defined(FileViewer):
         return self
 
     proc pipe(self: FileViewer, text: string, title = "") =
-        #close()
+        close()
         src = title
         feed = text.newStringStream()
 
