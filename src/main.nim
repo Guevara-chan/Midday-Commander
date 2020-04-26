@@ -794,7 +794,7 @@ when not defined(FileViewer):
         return iterator:ScreenLine = 
             for idx, line in fragment:
                 let lnum = y + idx
-                yield ((if line_numbers and lnum<=last_line and last_line!=0: lnum.`$`.fit_left(aligner)&":" else: ""),
+                yield ((if line_numbers and lnum<=last_line and last_line!=0: lnum.`$`.fit_left(aligner)&"|" else: ""),
                     "", line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:ScreenLine =
