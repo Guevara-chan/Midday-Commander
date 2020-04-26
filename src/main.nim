@@ -640,7 +640,7 @@ when not defined(FileViewer):
     # --Properties:
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
-    template vcap(self: FileViewer): int         = self.host.vlines - border_shift * (2 - self.fullscreen.int)
+    template vcap(self: FileViewer): int         = self.host.vlines - border_shift * 2 + self.fullscreen.int
     template hexcap(self: FileViewer): int       = self.hcap div (cell+1)
     template hexcells(self: FileViewer): int     = self.hexcap * self.vcap
     template right_edge(self: FileViewer): int   = widest_line - self.hcap
@@ -649,6 +649,7 @@ when not defined(FileViewer):
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
     template active(self: FileViewer): bool      = self.fullscreen
+    template bg(self: FileViewer): Color         = (if self.night: BLACK else: DARKBLUE.Fade 0.7)
 
     proc caption_limited(self: FileViewer): string =        
         if self.caption.runeLen > self.hcap-2: &"…{self.caption.runeSubStr(-self.hcap+4)}" else: self.caption
@@ -864,21 +865,20 @@ when not defined(FileViewer):
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
         host.margin = self.margin
-        let main_bg = if self.night: BLACK else: DARKBLUE.Fade 0.7
         proc write_centered(text: string, color: Color) =
             host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
             host.write @[" ", text, " "], color, DARKGRAY
         # Header render.
         with host:
             loc(self.margin, 0)
-            write if fullscreen: "═" else: "╒", border_color, main_bg
+            write if fullscreen: "═" else: "╒", border_color, self.bg
             write [" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
-            write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, main_bg
+            write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, self.bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
-            write [if fullscreen: "═" else: "╕", ""], border_color, main_bg
+            write [if fullscreen: "═" else: "╕", ""], border_color, self.bg
         if self.feed_avail and (y>0 or x>0 or fullscreen): # Locations hint.
             write_centered &"{y}:{x}" & (if self.data_piped: "" else: &"/off={pos:X}"), PURPLE
-        host.write "\n", border_color, main_bg
+        host.write "\n", border_color, self.bg
         # Rendering loop.
         let 
             lborder = if xoffset > 0: "┤" else: "│"
@@ -893,12 +893,13 @@ when not defined(FileViewer):
         # Footing render.
         if not fullscreen:  host.write "╘"
         elif x>0:           host.write "\x11", GOLD, DARKGRAY
-        else:               host.write "═"
-        host.write "═".repeat(self.hcap - fullscreen.int * 2), border_color, main_bg
+        else:               host.write "╒"
+        host.write "═".repeat(self.hcap - fullscreen.int * 2), border_color, self.bg
         if not fullscreen:  host.write "╛"
         elif x<self.right_edge: host.write "\x10", GOLD, DARKGRAY
-        else:               host.write "═"
+        else:               host.write "╕"
         write_centered self.caption_limited, (if self.feed_avail: Orange else: Maroon)
+        if self.fullscreen: host.write "\n"
         # Finalization.
         return self
 
@@ -1197,15 +1198,16 @@ when not defined(MultiViewer):
 
     method render(self: MultiViewer): Area {.discardable.} =
         # Commandline/viewers render.
-        if self.fullview: inspector.render(); return # Fullscreen inspector render.
-        elif not cmdline.exclusive:
-            let displaced = if self.previewing: self.next_viewer() else: nil
-            var offset = 0
-            for view in viewers: 
-                view.xoffset = offset # Offset lineup.
-                (if view == displaced: (view.adjust(); inspector) else: view).render() # Adjusting even if no render.
-                offset += view.viewer_width # Caluclating next post after adjustment.
-        cmdline.render()
+        if not self.fullview:
+            if not cmdline.exclusive:
+                let displaced = if self.previewing: self.next_viewer() else: nil
+                var offset = 0
+                for view in viewers: 
+                    view.xoffset = offset # Offset lineup.
+                    (if view == displaced: (view.adjust(); inspector) else: view).render() # Adjusting if no render.
+                    offset += view.viewer_width # Caluclating next post after adjustment.
+            cmdline.render()
+        else: inspector.render()            
         if cmdline.exclusive: return
         # Hints.
         if error.msg != "": # Error message.
@@ -1213,7 +1215,9 @@ when not defined(MultiViewer):
         else: # Hot keys.
             var idx: int
             host.loc(self.hint_margin, host.vpos)
-            let (hint_line, enabled) = if control_down(): (" | |byName|byExt|bySize|byModi| | | | ",
+            let (hint_line, enabled) = if self.fullview:  (" | |\x1AView\x1B|Cycle| | | | | |Quit",
+                                                          @[3, 4, 10])
+                elif control_down():                      (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
                 elif shift_down():                        (" | |\x11View\x10| | | |MkLink| | | ",
                                                           @[3, 7])
@@ -1227,6 +1231,9 @@ when not defined(MultiViewer):
                     if control_down() and idx-3 == self.active.sorter.int: GOLD
                         elif idx==3 and self.previewing and not control_down(): Orange 
                             elif idx in enabled: SKYBLUE else: GRAY
+            if self.fullview: with(host):
+                loc(0, host.vpos); write "│", border_color, self.inspector.bg 
+                loc(host.hlines-1, host.vpos); write "│", border_color, self.inspector.bg 
         # Finalization.
         return self
 
