@@ -788,14 +788,16 @@ when not defined(FileViewer):
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
         self.hide_colors = true
+        let aligner = cache.len.`$`.len + 2
         return iterator:ScreenLine = 
-            for line in fragment: yield ("", "", line.data.subStr(x).dup(removeSuffix("\c\n")))
+            for idx, line in fragment: 
+                yield ((&"{y+idx}:").fit_left(aligner), "", line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:ScreenLine =
         let feed = ascii_lense()
         self.hide_colors = false
         return iterator:ScreenLine = 
-            for (prefix, colored, raw) in feed: yield (prefix, colored, raw.dup(removeSuffix('\n')))
+            for (prefix, colored, raw) in feed: yield ("", colored, raw.dup(removeSuffix('\n')))
 
     proc hex_lense(self: FileViewer): iterator:ScreenLine =
         var 
@@ -905,6 +907,7 @@ when not defined(FileViewer):
             let len_shift = if self.hide_colors: 0 else: line.subStr(0, min(self.hcap, line.len)).count('\a') * 2
             with host:
                 write if fullscreen: "" else: lborder
+                write prefix, Purple # Line numbers, etc.
                 write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), self.fg, raw=self.hide_colors
                 write if fullscreen: "\n" else: rborder, self.border_clr
         # Footing render.
