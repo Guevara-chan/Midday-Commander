@@ -620,7 +620,8 @@ when not defined(ProgressWatch):
         ProgressWatch(host: term, parent: creator, start: getTime(), frameskip: true)
 # -------------------- #
 when not defined(FileViewer):
-    type DataLine = tuple[origin: int, data: string]
+    type DataLine   = tuple[origin: int, data: string]
+    type ScreenLine = tuple[prefix: string, colored: string, raw: string]
     type FileViewer = ref object of Area
         host: TerminalEmu
         feed: Stream
@@ -629,7 +630,7 @@ when not defined(FileViewer):
         walker: iterator:BiggestInt
         fullscreen, lense_switch, hide_colors, night: bool
         x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
-        lenses: Table[string, proc(fv: FileViewer): iterator ():string]
+        lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
         none, lense, minmax, lscroll, rscroll
     const
@@ -652,17 +653,17 @@ when not defined(FileViewer):
     template bg(self: FileViewer): Color         = (if self.night: BLACK     else: DARKBLUE.Fade 0.7)
     template fg(self: FileViewer): Color         = (if self.night: LIGHTGRAY else: RayWhite)
     template border_clr(self: FileViewer): Color = (if self.night: BEIGE else: GRAY)
-    template lense_fixed(self: FileViewer): bool = self.data_piped or not self.feed_avail
+    template fixed_view(self: FileViewer): bool  = self.data_piped or not self.feed_avail
 
     proc caption_limited(self: FileViewer): string =        
         if self.caption.runeLen > self.hcap-2: &"…{self.caption.runeSubStr(-self.hcap+4)}" else: self.caption
 
     proc hints(self: FileViewer): string =
-        [" | |\x1AView\x1B", if self.lense_fixed: "" elif lense_id == "ASCII": ":HEX" else: ":ASCII", 
-            if self.lense_fixed: "" elif self.night: "Day" else: "Night", " | | | |Exit"].join "|"
+        [" | |\x1AView\x1B", if self.fixed_view: "" elif lense_id == "ASCII": ":HEX" else: ":ASCII", 
+            if self.fixed_view: "" elif self.night: "Day" else: "Night", " | | | |Exit"].join "|"
 
     proc hintmask(self: FileViewer): seq[int] = 
-        @[3, 10, if self.lense_fixed: 0 else: 4, if self.lense_fixed: 0 else: 5]
+        @[3, 10, if self.fixed_view: 0 else: 4, if self.fixed_view: 0 else: 5]
 
     iterator cached_chars(self: FileViewer, start = 0): char =
         for line in cache:
@@ -777,31 +778,33 @@ when not defined(FileViewer):
                 if chr in dl_cap: break
             return (origin, buffer.join "")    
 
-    proc noise_lense(self: FileViewer): iterator:string =
-        return iterator:string =        
+    proc noise_lense(self: FileViewer): iterator:ScreenLine =
+        return iterator:ScreenLine =        
             for y in 0..<self.vcap:
                 let noise = collect(newSeq): (for x in 0..<self.hcap: "    01".sample)
-                yield noise.join ""
+                yield ("", "", noise.join "")
 
-    proc ascii_lense(self: FileViewer): iterator:string =
+    proc ascii_lense(self: FileViewer): iterator:ScreenLine =
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
         self.hide_colors = true
-        return iterator:string = (for line in fragment: yield line.data.subStr(x).dup(removeSuffix("\c\n")))
+        return iterator:ScreenLine = 
+            for line in fragment: yield ("", "", line.data.subStr(x).dup(removeSuffix("\c\n")))
 
-    proc ansi_lense(self: FileViewer): iterator:string =
+    proc ansi_lense(self: FileViewer): iterator:ScreenLine =
         let feed = ascii_lense()
         self.hide_colors = false
-        return iterator:string = (for line in feed: yield line.dup(removeSuffix('\n')))
+        return iterator:ScreenLine = 
+            for (prefix, colored, raw) in feed: yield (prefix, colored, raw.dup(removeSuffix('\n')))
 
-    proc hex_lense(self: FileViewer): iterator:string =
+    proc hex_lense(self: FileViewer): iterator:ScreenLine =
         var 
             accum: seq[string]
             recap: seq[char]
             lines_left = self.vcap
         self.hide_colors = true
-        return iterator:string =
-            template row_out(sum = recap.join "") = yield accum.join("") & sum; lines_left.dec # Aux tempalte.
+        return iterator:ScreenLine =
+            template row_out(sum = recap.join "") = yield ("", accum.join("") & sum, ""); lines_left.dec # Aux tempalte
             for chr in self.cached_chars(pos): 
                 accum.add &"{chr.int32:02X}" & # Smart delimiting.
                     (if accum.len == self.hexcap-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
@@ -812,7 +815,7 @@ when not defined(FileViewer):
                     accum.setLen 0
                     recap.setLen 0
             if accum.len > 0: row_out ' '.repeat(self.hexcap*cell-accum.len*cell-1) & "\xBA" & recap.join ""
-            for exceed in 1..lines_left: yield ""
+            for exceed in 1..lines_left: yield ("", "", "")
 
     proc cycle_lenses(self: FileViewer): FileViewer {.discardable.}  =
         lense_switch = not lense_switch
@@ -872,7 +875,7 @@ when not defined(FileViewer):
             elif KEY_Right.IsKeyDown:     (if norepeat(): hscroll 1)
             elif KEY_F3.IsKeyPressed and not shift_down(): switch_fullscreen 0
             elif KEY_F4.IsKeyPressed:     cycle_lenses()
-            elif KEY_F5.IsKeyPressed:     (if not self.lense_fixed(): switch_lighting())
+            elif KEY_F5.IsKeyPressed:     (if not self.fixed_view(): switch_lighting())
             elif KEY_F10.IsKeyPressed or KEY_Escape.IsKeyPressed: return nil
         return self
 
@@ -898,7 +901,7 @@ when not defined(FileViewer):
             lborder = if xoffset > 0: "┤" else: "│"
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
             render_list = lenses[lense_id](self)
-        for line in render_list(): 
+        for prefix, colored, line in render_list(): 
             let len_shift = if self.hide_colors: 0 else: line.subStr(0, min(self.hcap, line.len)).count('\a') * 2
             with host:
                 write if fullscreen: "" else: lborder
@@ -919,7 +922,7 @@ when not defined(FileViewer):
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
         result = FileViewer(host: term, xoffset: xoffset).close()
-        type fix = proc (fv: FileViewer): iterator (): string{.closure.}{.closure.} # Siome compiler glitches.
+        type fix = proc (fv: FileViewer): iterator:ScreenLine {.closure.}{.closure.} # Siome compiler glitches.
         result.lenses = 
             {"ASCII": ascii_lense.fix, "ANSI": ansi_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
         if src != "": result.open src
