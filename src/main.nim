@@ -649,10 +649,20 @@ when not defined(FileViewer):
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
     template active(self: FileViewer): bool      = self.fullscreen
-    template bg(self: FileViewer): Color         = (if self.night: BLACK else: DARKBLUE.Fade 0.7)
+    template bg(self: FileViewer): Color         = (if self.night: BLACK     else: DARKBLUE.Fade 0.7)
+    template fg(self: FileViewer): Color         = (if self.night: LIGHTGRAY else: RayWhite)
+    template border_clr(self: FileViewer): Color = (if self.night: BEIGE else: GRAY)
+    template lense_fixed(self: FileViewer): bool = self.data_piped or not self.feed_avail
 
     proc caption_limited(self: FileViewer): string =        
         if self.caption.runeLen > self.hcap-2: &"…{self.caption.runeSubStr(-self.hcap+4)}" else: self.caption
+
+    proc hints(self: FileViewer): string =
+        [" | |\x1AView\x1B", if self.lense_fixed: "" elif lense_id == "ASCII": ":HEX" else: ":ASCII", 
+            if self.lense_fixed: "" elif self.night: "Day" else: "Night", " | | | |Exit"].join "|"
+
+    proc hintmask(self: FileViewer): seq[int] = 
+        @[3, 10, if self.lense_fixed: 0 else: 4, if self.lense_fixed: 0 else: 5]
 
     iterator cached_chars(self: FileViewer, start = 0): char =
         for line in cache:
@@ -810,8 +820,11 @@ when not defined(FileViewer):
 
     proc switch_fullscreen(self: FileViewer, new_state = -1): FileViewer {.discardable.} =
         fullscreen = if new_state == -1: not fullscreen else: new_state.bool
-        vscroll(); hscroll()
+        vscroll(); hscroll(); night = false
         return self
+
+    proc switch_lighting(self: FileViewer, new_state = -1) =
+        night = not (if new_state == -1: night else: new_state.bool)
 
     method update(self: FileViewer): Area {.discardable.} =
         # Deffered data update.
@@ -857,9 +870,10 @@ when not defined(FileViewer):
             elif KEY_Down.IsKeyDown:      (if norepeat(): vscroll 1)
             elif KEY_Left.IsKeyDown:      (if norepeat(): hscroll -1)
             elif KEY_Right.IsKeyDown:     (if norepeat(): hscroll 1)
-            elif KEY_Escape.IsKeyPressed: return nil
             elif KEY_F3.IsKeyPressed and not shift_down(): switch_fullscreen 0
             elif KEY_F4.IsKeyPressed:     cycle_lenses()
+            elif KEY_F5.IsKeyPressed:     (if not self.lense_fixed(): switch_lighting())
+            elif KEY_F10.IsKeyPressed or KEY_Escape.IsKeyPressed: return nil
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -871,14 +885,14 @@ when not defined(FileViewer):
         # Header render.
         with host:
             loc(self.margin, 0)
-            write if fullscreen: "╘" else: "╒", border_color, self.bg
+            write if fullscreen: "╘" else: "╒", self.border_clr, self.bg
             write [" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
-            write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, self.bg
+            write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), self.border_clr, self.bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
-            write [if fullscreen: "╛" else: "╕", ""], border_color, self.bg
+            write [if fullscreen: "╛" else: "╕", ""], self.border_clr, self.bg
         if self.feed_avail and (y>0 or x>0 or fullscreen): # Locations hint.
             write_centered &"{y}:{x}" & (if self.data_piped: "" else: &"/off={pos:X}"), PURPLE
-        host.write "\n", border_color, self.bg
+        host.write "\n", self.border_clr, self.bg
         # Rendering loop.
         let 
             lborder = if xoffset > 0: "┤" else: "│"
@@ -888,13 +902,13 @@ when not defined(FileViewer):
             let len_shift = if self.hide_colors: 0 else: line.subStr(0, min(self.hcap, line.len)).count('\a') * 2
             with host:
                 write if fullscreen: "" else: lborder
-                write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), RayWhite, raw=self.hide_colors
-                write if fullscreen: "\n" else: rborder, border_color
+                write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), self.fg, raw=self.hide_colors
+                write if fullscreen: "\n" else: rborder, self.border_clr
         # Footing render.
         if not fullscreen:  host.write "╘"
         elif x>0:           host.write "\x11", GOLD, DARKGRAY
         else:               host.write "╒"
-        host.write "═".repeat(self.hcap - fullscreen.int * 2), border_color, self.bg
+        host.write "═".repeat(self.hcap - fullscreen.int * 2), self.border_clr, self.bg
         if not fullscreen:  host.write "╛"
         elif x<self.right_edge: host.write "\x10", GOLD, DARKGRAY
         else:               host.write "╕"
@@ -1078,7 +1092,7 @@ when not defined(MultiViewer):
                 self.active.dirty = true
 
     proc show_help(self: MultiViewer) =
-        inspect(help.join("\n"), "@HELP").switch_fullscreen(1).night = true
+        inspect(help.join("\n"), "@HELP").switch_fullscreen(1).switch_lighting(0)
 
     proc switch_inspector(self: MultiViewer) =
         if self.inspecting: uninspect() else: inspect()
@@ -1215,8 +1229,7 @@ when not defined(MultiViewer):
         else: # Hot keys.
             var idx: int
             host.loc(self.hint_margin, host.vpos)
-            let (hint_line, enabled) = if self.fullview:  (" | |\x1AView\x1B|Cycle| | | | | |Quit",
-                                                          @[3, 4, 10])
+            let (hint_line, enabled) = if self.fullview:  (self.inspector.hints, self.inspector.hintmask)
                 elif control_down():                      (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
                 elif shift_down():                        (" | |\x11View\x10| | | |MkLink| | | ",
@@ -1232,8 +1245,8 @@ when not defined(MultiViewer):
                         elif idx==3 and self.previewing and not control_down(): Orange 
                             elif idx in enabled: SKYBLUE else: GRAY
             if self.fullview: with(host):
-                loc(0, host.vpos); write "│", border_color, self.inspector.bg 
-                loc(host.hlines-1, host.vpos); write "│", border_color, self.inspector.bg 
+                loc(0, host.vpos); write "│", self.inspector.border_clr, self.inspector.bg 
+                loc(host.hlines-1, host.vpos); write "│", self.inspector.border_clr, self.inspector.bg 
         # Finalization.
         return self
 
