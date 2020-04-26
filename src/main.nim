@@ -871,11 +871,11 @@ when not defined(FileViewer):
         # Header render.
         with host:
             loc(self.margin, 0)
-            write if fullscreen: "═" else: "╒", border_color, self.bg
+            write if fullscreen: "╘" else: "╒", border_color, self.bg
             write [" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
             write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), border_color, self.bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
-            write [if fullscreen: "═" else: "╕", ""], border_color, self.bg
+            write [if fullscreen: "╛" else: "╕", ""], border_color, self.bg
         if self.feed_avail and (y>0 or x>0 or fullscreen): # Locations hint.
             write_centered &"{y}:{x}" & (if self.data_piped: "" else: &"/off={pos:X}"), PURPLE
         host.write "\n", border_color, self.bg
