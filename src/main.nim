@@ -629,7 +629,7 @@ when not defined(FileViewer):
         src, lense_id: string
         walker: iterator:BiggestInt
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
-        x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
+        x, y, pos, xoffset, last_line, last_pos, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
         none, lense, minmax, lscroll, rscroll
@@ -639,15 +639,17 @@ when not defined(FileViewer):
         cell = "FF ".len
 
     # --Properties:
+    template feed_avail(self: FileViewer): bool  = not feed.isNil
+    template data_piped(self: FileViewer): bool  = feed of StringStream
+    template feedsize(self: FileViewer): int     = (if self.data_piped: last_pos else: src.getFileSize.int)
+    template hexpos_edge(self: FileViewer): int  = (&"{self.feedsize:X}").len
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * 2 + self.fullscreen.int
-    template hexcap(self: FileViewer): int       = self.hcap div (cell+1)
+    template hexcap(self: FileViewer): int       = (self.hcap-(if line_numbers:self.hexpos_edge else:0)) div (cell+1) 
     template hexcells(self: FileViewer): int     = self.hexcap * self.vcap
     template right_edge(self: FileViewer): int   = widest_line - self.hcap
     template margin(self: FileViewer): int       = xoffset * (not self.fullscreen).int
-    template data_piped(self: FileViewer): bool  = feed of StringStream
-    template feed_avail(self: FileViewer): bool  = not feed.isNil
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
     template active(self: FileViewer): bool      = self.fullscreen
     template bg(self: FileViewer): Color         = (if self.night: BLACK     else: DARKBLUE.Fade 0.7)
@@ -686,7 +688,7 @@ when not defined(FileViewer):
 
     proc vscroll(self: FileViewer, shift = 0) =
         y   = max(0, min(if last_line > -1: last_line-self.vcap    else: int.high, y + shift))
-        pos = max(0, min(if feedsize  > -1: feedsize-self.hexcells else: int.high, pos + self.hexcap * shift))
+        pos = max(0, min(if self.feedsize > -1: self.feedsize-self.hexcells else: int.high, pos+self.hexcap*shift))
 
     proc hscroll(self: FileViewer, shift = 0) =
         x = max(0, min(self.right_edge, x + shift))
@@ -754,7 +756,7 @@ when not defined(FileViewer):
         line_numbers = false
         lense_switch = false
         (x, pos, y) = (0, 0, 0)
-        (last_line, feedsize) = (-1, -1)
+        (last_line, last_pos) = (-1, -1)
         return self
 
     proc pipe(self: FileViewer, text: string, title = "") =
@@ -808,15 +810,19 @@ when not defined(FileViewer):
             accum: seq[string]
             recap: seq[char]
             lines_left = self.vcap
+            fpos = pos
         self.hide_colors = true
+        template row_out(sum = recap.join "") = # Aux template
+            lines_left.dec 
+            yield ((if line_numbers: (&"{fpos:X}|").align(self.hexpos_edge, '0') else: ""), "", accum.join("") & sum)
         return iterator:ScreenLine =
-            template row_out(sum = recap.join "") = yield ("", "", accum.join("") & sum); lines_left.dec # Aux template
             for chr in self.cached_chars(pos): 
                 accum.add &"{chr.int32:02X}" & # Smart delimiting.
                     (if accum.len == self.hexcap-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
                 recap.add chr
                 if accum.len >= self.hexcap:
-                    row_out()                    
+                    row_out()
+                    fpos += recap.len               
                     if lines_left == 0: return
                     accum.setLen 0
                     recap.setLen 0
@@ -847,10 +853,10 @@ when not defined(FileViewer):
                     widest_line = max(line.data.len, widest_line)
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
-                    if feed.atEnd: (last_line, feedsize) = (cache.len-1, feed.getPosition)
+                    if feed.atEnd: (last_line, last_pos) = (cache.len-1, feed.getPosition)
                     if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
-                    (last_line, feedsize) = (0, 0)
+                    (last_line, last_pos) = (0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
             # Deep analyzis.
