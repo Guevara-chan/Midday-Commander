@@ -660,8 +660,8 @@ when not defined(FileViewer):
 
     proc hints(self: FileViewer): string =
         [" | |\x1AView\x1B", if self.fixed_view: "" elif lense_id == "ASCII": ":HEX" else: ":ASCII", 
-            if self.fixed_view: "" elif self.night: "Day" else: "Night", if self.fixed_view: "" else: "LNums", 
-                " | | | |Exit"].join "|"
+            if self.fixed_view: "" elif self.night: "Day" else: "Night", 
+                if self.fixed_view: "" elif self.line_numbers: "-LNums" else: "+LNums", " | | |Exit"].join "|"
 
     proc hintmask(self: FileViewer): seq[int] = 
         @[3, 10, if self.fixed_view: 0 else: 4, if self.fixed_view: 0 else: 5, if self.fixed_view: 0 else: 6]
@@ -790,11 +790,11 @@ when not defined(FileViewer):
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
         self.hide_colors = true
-        let aligner = cache.len.`$`.len + 2
+        let aligner = cache.len.`$`.len
         return iterator:ScreenLine = 
             for idx, line in fragment:
                 let lnum = y + idx
-                yield ((if line_numbers and lnum<=last_line and last_line!=0: (&"{lnum}:").fit_left(aligner) else: ""),
+                yield ((if line_numbers and lnum<=last_line and last_line!=0: lnum.`$`.fit_left(aligner)&":" else: ""),
                     "", line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:ScreenLine =
