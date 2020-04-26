@@ -790,8 +790,10 @@ when not defined(FileViewer):
         self.hide_colors = true
         let aligner = cache.len.`$`.len + 2
         return iterator:ScreenLine = 
-            for idx, line in fragment: 
-                yield ((&"{y+idx}:").fit_left(aligner), "", line.data.subStr(x).dup(removeSuffix("\c\n")))
+            for idx, line in fragment:
+                let lnum = y + idx
+                yield ((if lnum <= last_line and last_line != 0: (&"{y+idx}:").fit_left(aligner) else: ""), "", 
+                    line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:ScreenLine =
         let feed = ascii_lense()
@@ -806,7 +808,7 @@ when not defined(FileViewer):
             lines_left = self.vcap
         self.hide_colors = true
         return iterator:ScreenLine =
-            template row_out(sum = recap.join "") = yield ("", accum.join("") & sum, ""); lines_left.dec # Aux tempalte
+            template row_out(sum = recap.join "") = yield ("", "", accum.join("") & sum); lines_left.dec # Aux template
             for chr in self.cached_chars(pos): 
                 accum.add &"{chr.int32:02X}" & # Smart delimiting.
                     (if accum.len == self.hexcap-1: '\xBA' elif accum.len %% 5 == 4: '\xB3' else: ' ')
@@ -904,7 +906,8 @@ when not defined(FileViewer):
             rborder = (if xoffset < host.hlines - self.width: "├" else: "│") & "\n"
             render_list = lenses[lense_id](self)
         for prefix, colored, line in render_list(): 
-            let len_shift = if self.hide_colors: 0 else: line.subStr(0, min(self.hcap, line.len)).count('\a') * 2
+            let len_shift = (if self.hide_colors: 0 else: line.subStr(0, min(self.hcap, line.len)).count('\a') * 2) -
+                prefix.len
             with host:
                 write if fullscreen: "" else: lborder
                 write prefix, Purple # Line numbers, etc.
