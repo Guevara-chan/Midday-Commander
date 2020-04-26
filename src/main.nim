@@ -628,7 +628,7 @@ when not defined(FileViewer):
         cache: seq[DataLine]
         src, lense_id: string
         walker: iterator:BiggestInt
-        fullscreen, lense_switch, hide_colors, night: bool
+        fullscreen, lense_switch, hide_colors, night, line_numbers: bool
         x, y, pos, xoffset, last_line, feedsize, char_total, widest_line: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
@@ -660,10 +660,11 @@ when not defined(FileViewer):
 
     proc hints(self: FileViewer): string =
         [" | |\x1AView\x1B", if self.fixed_view: "" elif lense_id == "ASCII": ":HEX" else: ":ASCII", 
-            if self.fixed_view: "" elif self.night: "Day" else: "Night", " | | | |Exit"].join "|"
+            if self.fixed_view: "" elif self.night: "Day" else: "Night", if self.fixed_view: "" else: "LNums", 
+                " | | | |Exit"].join "|"
 
     proc hintmask(self: FileViewer): seq[int] = 
-        @[3, 10, if self.fixed_view: 0 else: 4, if self.fixed_view: 0 else: 5]
+        @[3, 10, if self.fixed_view: 0 else: 4, if self.fixed_view: 0 else: 5, if self.fixed_view: 0 else: 6]
 
     iterator cached_chars(self: FileViewer, start = 0): char =
         for line in cache:
@@ -750,6 +751,7 @@ when not defined(FileViewer):
         cache.setLen 0
         char_total = 0
         widest_line = 0
+        line_numbers = false
         lense_switch = false
         (x, pos, y) = (0, 0, 0)
         (last_line, feedsize) = (-1, -1)
@@ -792,8 +794,8 @@ when not defined(FileViewer):
         return iterator:ScreenLine = 
             for idx, line in fragment:
                 let lnum = y + idx
-                yield ((if lnum <= last_line and last_line != 0: (&"{y+idx}:").fit_left(aligner) else: ""), "", 
-                    line.data.subStr(x).dup(removeSuffix("\c\n")))
+                yield ((if line_numbers and lnum<=last_line and last_line!=0: (&"{lnum}:").fit_left(aligner) else: ""),
+                    "", line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:ScreenLine =
         let feed = ascii_lense()
@@ -880,6 +882,7 @@ when not defined(FileViewer):
             elif KEY_F3.IsKeyPressed and not shift_down(): switch_fullscreen 0
             elif KEY_F4.IsKeyPressed:     cycle_lenses()
             elif KEY_F5.IsKeyPressed:     (if not self.fixed_view(): switch_lighting())
+            elif KEY_F6.IsKeyPressed:     line_numbers = not line_numbers
             elif KEY_F10.IsKeyPressed or KEY_Escape.IsKeyPressed: return nil
         return self
 
