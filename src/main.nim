@@ -627,9 +627,10 @@ when not defined(FileViewer):
         feed: Stream
         cache: seq[DataLine]
         src, lense_id: string
+        fkey_feed: proc(x, y: int): int
         walker: iterator:BiggestInt
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
-        x, y, pos, xoffset, last_line, last_pos, char_total, widest_line: int
+        x, y, pos, xoffset, last_line, last_pos, char_total, widest_line, f_key: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
         none, lense, minmax, lscroll, rscroll
@@ -935,8 +936,8 @@ when not defined(FileViewer):
         # Finalization.
         return self
 
-    proc newFileViewer(term: TerminalEmu, xoffset: int, src = ""): FileViewer =
-        result = FileViewer(host: term, xoffset: xoffset).close()
+    proc newFileViewer(term: TerminalEmu, xoffset: int, fkey_feeder: proc(x, y: int): int, src = ""): FileViewer =
+        result = FileViewer(host: term, xoffset: xoffset, fkey_feed: fkey_feeder).close()
         type fix = proc (fv: FileViewer): iterator:ScreenLine {.closure.}{.closure.} # Siome compiler glitches.
         result.lenses = 
             {"ASCII": ascii_lense.fix, "ANSI": ansi_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
@@ -982,6 +983,11 @@ when not defined(MultiViewer):
             if view != feed and view.path == feed.path: 
                 let prev_hl = view.hline
                 view.refresh().scroll_to prev_hl
+
+    proc pick_fkey(self: MultiViewer; x, y: int): int =
+        if y == host.vlines-1:
+            let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
+            if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): return index.int
 
     proc reset_watcher(self: MultiViewer) =
         watcher = newProgressWatch(host, self)
@@ -1043,15 +1049,15 @@ when not defined(MultiViewer):
         let 
             target = self.active.hentry
             path = self.active.path / self.active.hentry.name
-        if self.inspecting: inspector.open path                               # Reusing existing fileviewer
-        else: inspector = newFileViewer(host, self.next_viewer.xoffset, path) # Opening new fileviewer
+        if self.inspecting: inspector.open path # <-Reusing existing fileviewer/opening new V
+        else: inspector = newFileViewer(host, self.next_viewer.xoffset, ((x, y: int) => self.pick_fkey(x, y)), path)
         return inspector
 
     proc inspect(self: MultiViewer, text: string, title: string): FileViewer {.discardable.} =
-        if not self.inspecting: inspector = newFileViewer(host, self.next_viewer.xoffset)
+        if not self.inspecting: 
+            inspector = newFileViewer(host, self.next_viewer.xoffset, ((x, y: int) => self.pick_fkey(x, y)))
         inspector.pipe(text, title)
         return inspector
-
        
     proc copy(self: MultiViewer) =
         if self.active.path != self.next_path: sel_transfer(self, copyDir, copyFile)
@@ -1158,7 +1164,6 @@ when not defined(MultiViewer):
         return -1
 
     method update(self: MultiViewer): Area {.discardable.} =
-        f_key = 0 # F-key emulator.
         try:
             if not self.fullview: cmdline.update()
             if self.fullview: (if inspector.update().isNil: uninspect())
@@ -1170,10 +1175,7 @@ when not defined(MultiViewer):
                     fv_pick = if inspector.isNil: FVControls.none else: inspector.picked_control
                 if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown: # DirViewers picking.
                     if fv_pick == FVControls.none and picked_view_idx >= 0: select picked_view_idx
-                elif MOUSE_Left_Button.IsMouseButtonReleased: # Command buttons picking.
-                    if y == host.vlines-1: # Hints check for click in button bounds to activate it.
-                        let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
-                        if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): f_key = index.int
+                elif MOUSE_Left_Button.IsMouseButtonReleased: f_key = pick_fkey(x, y) # Command buttons picking.
                 # Drag/drop handling.
                 let droplist = check_droplist()                
                 if droplist.len > 0:
