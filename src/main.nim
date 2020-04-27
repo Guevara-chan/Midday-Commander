@@ -643,6 +643,7 @@ when not defined(FileViewer):
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template data_piped(self: FileViewer): bool  = feed of StringStream
     template feedsize(self: FileViewer): int     = (if self.data_piped: last_pos else: src.getFileSize.int)
+    template total_lines(self: FileViewer): int  = (if last_line > -1: last_line else: int.high)
     template hexpos_edge(self: FileViewer): int  = (&"{self.feedsize:X}").len
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
@@ -688,7 +689,7 @@ when not defined(FileViewer):
         return FVControls.none
 
     proc vscroll(self: FileViewer, shift = 0) =
-        y   = max(0, min(if last_line > -1: last_line-self.vcap    else: int.high, y + shift))
+        y   = max(0, min(self.total_lines-self.vcap, y + shift))
         pos = max(0, min(if self.feedsize > -1: self.feedsize-self.hexcells else: int.high, pos+self.hexcap*shift))
 
     proc hscroll(self: FileViewer, shift = 0) =
@@ -797,8 +798,8 @@ when not defined(FileViewer):
         return iterator:ScreenLine = 
             for idx, line in fragment:
                 let lnum = y + idx
-                yield ((if line_numbers and lnum<=last_line and last_line!=0: lnum.`$`.fit_left(aligner)&"|" else: ""),
-                    "", line.data.subStr(x).dup(removeSuffix("\c\n")))
+                yield ((if line_numbers and lnum<=self.total_lines and last_line!=0: (lnum+1).`$`.fit_left(aligner)&"|"
+                else: ""), "", line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:ScreenLine =
         let feed = ascii_lense()
