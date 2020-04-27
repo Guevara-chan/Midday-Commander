@@ -843,6 +843,7 @@ when not defined(FileViewer):
         night = not (if new_state == -1: night else: new_state.bool)
 
     method update(self: FileViewer): Area {.discardable.} =
+        f_key = 0 # F-key emulator.
         # Deffered data update.
         defer:
             lense_id = if self.feed_avail: # Data pumping.
@@ -877,7 +878,7 @@ when not defined(FileViewer):
             case picked_control():
                 of FVControls.lense:    cycle_lenses() # Switch view mode on inspector tag click.
                 of FVControls.minmax:   switch_fullscreen() # Switch between preview & full modes.
-                else: discard
+                else: f_key = fkey_feed(x, y)          # Command buttons picking.
         # Keyboard controls.
         if self.active:
             if   KEY_PageUp.IsKeyDown:    (if norepeat(): vscroll -self.vcap)
@@ -886,11 +887,11 @@ when not defined(FileViewer):
             elif KEY_Down.IsKeyDown:      (if norepeat(): vscroll 1)
             elif KEY_Left.IsKeyDown:      (if norepeat(): hscroll -1)
             elif KEY_Right.IsKeyDown:     (if norepeat(): hscroll 1)
-            elif KEY_F3.IsKeyPressed and not shift_down(): switch_fullscreen 0
-            elif KEY_F4.IsKeyPressed:     cycle_lenses()
-            elif KEY_F5.IsKeyPressed:     (if not self.fixed_view(): switch_lighting())
-            elif KEY_F6.IsKeyPressed:     line_numbers = not line_numbers
-            elif KEY_F10.IsKeyPressed or KEY_Escape.IsKeyPressed: return nil
+            elif KEY_F3.IsKeyPressed and not shift_down() or f_key == 3: switch_fullscreen 0
+            elif KEY_F4.IsKeyPressed  or f_key == 4:                     cycle_lenses()
+            elif KEY_F5.IsKeyPressed  or f_key == 5:                     (if not self.fixed_view(): switch_lighting())
+            elif KEY_F6.IsKeyPressed  or f_key == 6:                     line_numbers = not line_numbers
+            elif KEY_F10.IsKeyPressed or f_key == 10 or KEY_Escape.IsKeyPressed: return nil
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -1164,6 +1165,7 @@ when not defined(MultiViewer):
         return -1
 
     method update(self: MultiViewer): Area {.discardable.} =
+        f_key = 0 # F-key emulator.
         try:
             if not self.fullview: cmdline.update()
             if self.fullview: (if inspector.update().isNil: uninspect())
