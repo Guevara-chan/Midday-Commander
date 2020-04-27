@@ -630,7 +630,7 @@ when not defined(FileViewer):
         walker: iterator:BiggestInt
         fkey_feed: proc(x, y: int): int
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
-        x, y, pos, xoffset, last_line, last_pos, char_total, widest_line, f_key: int
+        x, y, pos, xoffset, last_line, last_pos, char_total, widest_line, hexpos_edge, f_key: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
         none, lense, minmax, lscroll, rscroll
@@ -644,7 +644,6 @@ when not defined(FileViewer):
     template data_piped(self: FileViewer): bool  = feed of StringStream
     template feedsize(self: FileViewer): int     = (if self.data_piped: last_pos else: src.getFileSize.int)
     template total_lines(self: FileViewer): int  = (if last_line > -1: last_line else: int.high)
-    template hexpos_edge(self: FileViewer): int  = (&"{self.feedsize:X}").len
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * 2 + self.fullscreen.int
@@ -863,10 +862,11 @@ when not defined(FileViewer):
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: (last_line, last_pos) = (cache.len-1, feed.getPosition)
-                    y = max(0, min(y, last_line-self.vcap)) # Post-poned Y position update.
+                    hexpos_edge = (&"{self.feedsize:X}").len # Should only be calculated here for performace.
+                    y = max(0, min(y, last_line-self.vcap))  # Post-poned Y position update.
                     if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
-                    (last_line, last_pos, y) = (0, 0, 0)
+                    (last_line, last_pos, y, hexpos_edge) = (0, 0, 0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
             # Deep analyzis.
