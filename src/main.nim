@@ -854,7 +854,7 @@ when not defined(FileViewer):
         defer:
             lense_id = if self.feed_avail: # Data pumping.
                 let start = getTime()
-                while (cache.len < y + self.vcap or pos+self.hexcells < char_total) and not feed.atEnd:
+                while (cache.len < y + self.vcap or char_total < pos+self.hexcells) and not feed.atEnd:
                     let line = read_data_line()
                     cache.add line
                     char_total += line.data.len
