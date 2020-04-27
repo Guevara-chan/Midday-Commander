@@ -682,7 +682,7 @@ when not defined(FileViewer):
                 return FVControls.lense
             if x+fullscreen.int*border_shift in self.margin+self.hcap-"╡↔╞".runeLen+1..self.margin+self.hcap:
                 return FVControls.minmax
-        elif y == self.vcap+1:
+        elif y == self.vcap+border_shift:
             if x == 0:           return FVControls.lscroll
             if x == self.hcap-1: return FVControls.rscroll
         return FVControls.none
@@ -842,6 +842,12 @@ when not defined(FileViewer):
     proc switch_lighting(self: FileViewer, new_state = -1) =
         night = not (if new_state == -1: night else: new_state.bool)
 
+    proc post_render(self: FileViewer) =
+            host.loc(0, host.vpos)
+            if x>0: host.write "\x11", GOLD, DARKGRAY else: host.write "│", self.border_clr, self.bg 
+            host.loc(host.hlines-1, host.vpos)
+            if x<self.right_edge: host.write "\x10", GOLD, DARKGRAY: else: host.write "│", self.border_clr, self.bg 
+
     method update(self: FileViewer): Area {.discardable.} =
         f_key = 0 # F-key emulator.
         # Deffered data update.
@@ -926,13 +932,10 @@ when not defined(FileViewer):
                 write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), self.fg, raw=self.hide_colors
                 write if fullscreen: "\n" else: rborder, self.border_clr
         # Footing render.
-        if not fullscreen:  host.write "╘"
-        elif x>0:           host.write "\x11", GOLD, DARKGRAY
-        else:               host.write "╒"
-        host.write "═".repeat(self.hcap - fullscreen.int * 2), self.border_clr, self.bg
-        if not fullscreen:  host.write "╛"
-        elif x<self.right_edge: host.write "\x10", GOLD, DARKGRAY
-        else:               host.write "╕"
+        with(host):
+            write if fullscreen: "╒" else: "╘"
+            write "═".repeat(self.hcap - fullscreen.int * 2), self.border_clr, self.bg
+            write if fullscreen: "╕" else: "╛"
         write_centered self.caption_limited, (if self.feed_avail: Orange else: Maroon)
         if self.fullscreen: host.write "\n"
         # Finalization.
@@ -1267,9 +1270,7 @@ when not defined(MultiViewer):
                     if control_down() and idx-3 == self.active.sorter.int: GOLD
                         elif idx==3 and self.previewing and not control_down(): Orange 
                             elif idx in enabled: SKYBLUE else: GRAY
-            if self.fullview: with(host):
-                loc(0, host.vpos); write "│", self.inspector.border_clr, self.inspector.bg 
-                loc(host.hlines-1, host.vpos); write "│", self.inspector.border_clr, self.inspector.bg 
+            if self.fullview: self.inspector.post_render() # Drawing additional stuff for full-screen.
         # Finalization.
         return self
 
