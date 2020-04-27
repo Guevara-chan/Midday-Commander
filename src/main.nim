@@ -627,8 +627,8 @@ when not defined(FileViewer):
         feed: Stream
         cache: seq[DataLine]
         src, lense_id: string
-        fkey_feed: proc(x, y: int): int
         walker: iterator:BiggestInt
+        fkey_feed: proc(x, y: int): int
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
         x, y, pos, xoffset, last_line, last_pos, char_total, widest_line, f_key: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
@@ -867,6 +867,7 @@ when not defined(FileViewer):
                 for checkpoint in walker:
                     if (getTime() - start).inMilliseconds > 50: break
         # Mouse controls.
+        let (x, y) = host.pick()
         if self.active:
             vscroll -GetMouseWheelMove()
             if MOUSE_Left_Button.IsMouseButtonDown:
@@ -878,7 +879,7 @@ when not defined(FileViewer):
             case picked_control():
                 of FVControls.lense:    cycle_lenses() # Switch view mode on inspector tag click.
                 of FVControls.minmax:   switch_fullscreen() # Switch between preview & full modes.
-                else: f_key = fkey_feed(x, y)          # Command buttons picking.
+                elif self.active: f_key = fkey_feed(x, y)   # Command buttons picking.
         # Keyboard controls.
         if self.active:
             if   KEY_PageUp.IsKeyDown:    (if norepeat(): vscroll -self.vcap)
