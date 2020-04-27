@@ -689,7 +689,7 @@ when not defined(FileViewer):
         return FVControls.none
 
     proc vscroll(self: FileViewer, shift = 0) =
-        y   = max(0, min(self.total_lines-self.vcap, y + shift))
+        y   = max(0, y + shift) # Bootom edge is postponed due to uncertain nature.
         pos = max(0, min(if self.feedsize > -1: self.feedsize-self.hexcells else: int.high, pos+self.hexcap*shift))
 
     proc hscroll(self: FileViewer, shift = 0) =
@@ -862,10 +862,11 @@ when not defined(FileViewer):
                     widest_line = max(line.data.len, widest_line)
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
-                    if feed.atEnd: (last_line, last_pos) = (cache.len-1, feed.getPosition)
+                    if feed.atEnd: 
+                        (last_line, last_pos, y) = (cache.len-1, feed.getPosition, min(y, cache.len-1-self.vcap))
                     if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
-                    (last_line, last_pos) = (0, 0)
+                    (last_line, last_pos, y) = (0, 0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
             # Deep analyzis.
@@ -944,7 +945,7 @@ when not defined(FileViewer):
 
     proc newFileViewer(term: TerminalEmu, xoffset: int, fkey_feeder: proc(x, y: int): int, src = ""): FileViewer =
         result = FileViewer(host: term, xoffset: xoffset, fkey_feed: fkey_feeder).close()
-        type fix = proc (fv: FileViewer): iterator:ScreenLine {.closure.}{.closure.} # Siome compiler glitches.
+        type fix = proc (fv: FileViewer): iterator:ScreenLine {.closure.}{.closure.} # Some compiler glitches.
         result.lenses = 
             {"ASCII": ascii_lense.fix, "ANSI": ansi_lense.fix, "HEX": hex_lense.fix, "ERROR": noise_lense.fix}.toTable
         if src != "": result.open src
