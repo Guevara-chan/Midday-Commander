@@ -715,7 +715,8 @@ when not defined(FileViewer):
             while (getTime() - start).inMilliseconds < 500: yield 0 # Init delay.
             for dir in lazy_xtree(path.normalizePathEnd(true).truePath):
                 try:
-                    let files = toSeq(walkFiles(dir / "*"))
+                    yield 0
+                    let files = toSeq(walkFiles(dir / "*"))                    
                     for file in files: total_size += file.getFileSize; total_files.inc; yield total_size
                     total_dirs.inc
                 except: discard # FS error = no count.
@@ -925,7 +926,8 @@ when not defined(FileViewer):
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
             write [if fullscreen: "╛" else: "╕", ""], self.border_clr, self.bg
         if self.feed_avail and (y>0 or x>0 or fullscreen): # Locations hint.
-            write_centered &"{y}:{x}" & (if self.data_piped: "" else: &"/off={pos:X}"), PURPLE
+            write_centered [if linecount-self.vcap>0: $y else: "*", ":", if self.right_edge > self.hcap: $x else: "*", 
+                if self.data_piped or feedsize-self.hexcells<=0: "" else: &"/off={pos:X}"].join(""), PURPLE
         host.write "\n", self.border_clr, self.bg
         # Rendering loop.
         let 
@@ -1108,7 +1110,7 @@ when not defined(MultiViewer):
         for idx, entry in self.active.selected_entries:
             if entry.name != direxit.name: # No deletion for ..
                 let victim = self.active.path / entry.name
-                if self.inspected_path == victim: self.inspector.close()
+                if self.inspected_path == victim: inspector.close()
                 if victim == self.active.path: self.active.chdir direxit.name
                 wait_task spawn victim.deleter(entry.is_dir)
             else: self.active.switch_selection(idx, 0)
@@ -1137,7 +1139,7 @@ when not defined(MultiViewer):
 
     proc switch_inspector_fs(self: MultiViewer) =
         if not self.inspecting: inspect()
-        self.inspector.switch_fullscreen 1
+        inspector.switch_fullscreen 1
 
     proc switch_sorter(self: MultiViewer, criteria = SortCriteria.default) =
         self.active.switch_sorter criteria
@@ -1265,7 +1267,7 @@ when not defined(MultiViewer):
             var idx: int
             if self.fullview: f_key = inspector.f_key
             host.loc(self.hint_margin, host.vpos)
-            let (hint_line, enabled) = if self.fullview:  (self.inspector.hints, self.inspector.hintmask)
+            let (hint_line, enabled) = if self.fullview:  (inspector.hints, inspector.hintmask)
                 elif control_down():                      (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
                 elif shift_down():                        (" | |\x11View\x10| | | |MkLink| | | ",
@@ -1280,7 +1282,7 @@ when not defined(MultiViewer):
                     if control_down() and idx-3 == self.active.sorter.int: GOLD
                         elif idx==3 and self.previewing and not control_down(): Orange 
                             elif idx in enabled: SKYBLUE else: GRAY
-            if self.fullview: self.inspector.post_render() # Drawing additional stuff for full-screen.
+            if self.fullview: inspector.post_render() # Drawing additional stuff for full-screen.
         # Finalization.
         return self
 
