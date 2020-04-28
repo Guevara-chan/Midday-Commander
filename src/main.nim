@@ -630,7 +630,7 @@ when not defined(FileViewer):
         walker: iterator:BiggestInt
         fkey_feed: proc(x, y: int): int
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
-        x, y, pos, xoffset, last_line, last_pos, char_total, widest_line, hexpos_edge, f_key: int
+        x, y, pos, xoffset, last_line, feedsize, char_total, widest_line, hexpos_edge, f_key: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
         none, lense, minmax, lscroll, rscroll
@@ -642,7 +642,6 @@ when not defined(FileViewer):
     # --Properties:
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template data_piped(self: FileViewer): bool  = feed of StringStream
-    template feedsize(self: FileViewer): int     = (if self.data_piped: last_pos else: src.getFileSize.int)
     template total_lines(self: FileViewer): int  = (if last_line > -1: last_line else: int.high)
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
@@ -689,7 +688,7 @@ when not defined(FileViewer):
 
     proc vscroll(self: FileViewer, shift = 0) =
         y += shift # Check is postponed due to uncertain nature.
-        pos = max(0, min(if self.feedsize > -1: self.feedsize-self.hexcells else: int.high, pos+self.hexcap*shift))
+        pos = max(0, min(feedsize-self.hexcells, pos+self.hexcap*shift))
 
     proc hscroll(self: FileViewer, shift = 0) =
         x = max(0, min(self.right_edge, x + shift))
@@ -752,24 +751,26 @@ when not defined(FileViewer):
         src = ""
         night = false
         cache.setLen 0
-        char_total = 0
-        widest_line = 0
+        char_total   = 0
+        widest_line  = 0
+        last_line    = -1
         line_numbers = false
         lense_switch = false
-        (x, pos, y) = (0, 0, 0)
-        (last_line, last_pos) = (-1, -1)
+        (x, pos, y)  = (0, 0, 0)
         return self
 
     proc pipe(self: FileViewer, text: string, title = "") =
         close()
         src = title
+        feedsize = text.len
         feed = text.newStringStream()
 
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
             close()
             try: 
-                if path.dirExists: pipe dir_checkout(path) else: feed = path.truePath.newFileStream fmRead
+                if path.dirExists: pipe dir_checkout(path)
+                else: feed = path.truePath.newFileStream fmRead; feedsize = path.getFileSize.int
             except: discard # special case to not use handler to MultiViewer.
         src = path.absolutePath
 
@@ -861,12 +862,12 @@ when not defined(FileViewer):
                     widest_line = max(line.data.len, widest_line)
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
-                    if feed.atEnd: (last_line, last_pos) = (cache.len-1, feed.getPosition)
-                    hexpos_edge = (&"{self.feedsize:X}").len # Should only be calculated here for performace.
-                    y = max(0, min(y, last_line-self.vcap))  # Post-poned Y position update.
+                    if feed.atEnd: last_line = cache.len-1
+                    hexpos_edge = (&"{feedsize:X}").len     # Should only be calculated here for performace.
+                    y = max(0, min(y, last_line-self.vcap)) # Post-poned Y position update.
                     if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
-                    (last_line, last_pos, y, hexpos_edge) = (0, 0, 0, 0)
+                    (last_line, y, hexpos_edge) = (0, 0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
             # Deep analyzis.
