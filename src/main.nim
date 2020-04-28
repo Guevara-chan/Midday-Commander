@@ -1263,6 +1263,7 @@ when not defined(MultiViewer):
             host.write error.msg.fit(host.hlines+1), BLACK, MAROON
         else: # Hot keys.
             var idx: int
+            if self.fullview: f_key = inspector.f_key
             host.loc(self.hint_margin, host.vpos)
             let (hint_line, enabled) = if self.fullview:  (self.inspector.hints, self.inspector.hintmask)
                 elif control_down():                      (" | |byName|byExt|bySize|byModi| | | | ",
