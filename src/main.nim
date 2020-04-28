@@ -630,7 +630,7 @@ when not defined(FileViewer):
         walker: iterator:BiggestInt
         fkey_feed: proc(x, y: int): int
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
-        x, y, pos, xoffset, linecount, feedsize, char_total, widest_line, hexpos_edge, f_key: int
+        x, y, pos, xoffset, linecount, feedsize, char_total, widest_line, hexpos_edge, ticker, f_key: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
         none, lense, minmax, lscroll, rscroll
@@ -708,24 +708,23 @@ when not defined(FileViewer):
                 files.inc; surf_size += record.path.getFileSize
                 if record.path.isHidden: hidden_files.inc
                 ext_table.inc(record.path.splitFile.ext)
-        # Deep analyzing prearations.
+        # Deep analyzing preparations.
         if subdirs > 0: walker = iterator: BiggestInt =
-            var 
-                total_size, total_files, total_dirs: BiggestInt
-            let start_time = getTime()
-            while (getTime() - start_time).inMilliseconds < 500: yield 0 # Init delay.
+            var total_size, total_files, total_dirs: BiggestInt
+            let start = getTime()
+            while (getTime() - start).inMilliseconds < 500: yield 0 # Init delay.
             for dir in lazy_xtree(path.normalizePathEnd(true).truePath):
                 try:
                     let files = toSeq(walkFiles(dir / "*"))
                     for file in files: total_size += file.getFileSize; total_files.inc; yield total_size
                     total_dirs.inc
                 except: discard # FS error = no count.
-            let last_pos = feed.getPosition
             if ext_table.len > 0: feed.writeLine(block_sep)
             feed.writeLine(&"Total data size: \a\x06{total_size.by3}\a\x00 bytes")
             feed.writeLine(&"Total sub-directories: \a\x06{(total_dirs-1).by3}")
             feed.writeLine(&"Total files: \a\x06{total_files.by3}")
-            feed.setPosition last_pos
+            feed.setPosition feedsize # Tracing pos back for new stuff to get readen.
+            yield -1 # Signalling self-disposal.
         # Extensions breakdown.
         ext_table["\a\x05<nil>"] = ext_table[""]
         ext_table.del("")
@@ -877,6 +876,7 @@ when not defined(FileViewer):
             if walker != nil:
                 let start = getTime()
                 for checkpoint in walker:
+                    if checkpoint == -1: walker = nil; break
                     if (getTime() - start).inMilliseconds > 25: break
         # Mouse controls.
         let (x, y) = host.pick()
@@ -910,14 +910,17 @@ when not defined(FileViewer):
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
         host.margin = self.margin
+        ticker = (ticker + 1) %% 4
+        let peller = if walker.isNil: " " else: $("\\|/-"[ticker])
         proc write_centered(text: string, color: Color) =
             host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
             host.write @[" ", text, " "], color, DARKGRAY
         # Header render.
+
         with host:
             loc(self.margin, 0)
             write if fullscreen: "╘" else: "╒", self.border_clr, self.bg
-            write [" ", lense_id, " "], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
+            write [" ", lense_id, peller], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
             write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), self.border_clr, self.bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
             write [if fullscreen: "╛" else: "╕", ""], self.border_clr, self.bg
