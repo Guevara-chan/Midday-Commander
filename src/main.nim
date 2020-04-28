@@ -712,10 +712,14 @@ when not defined(FileViewer):
         if subdirs > 0: walker = iterator: BiggestInt =
             var 
                 total_size, total_files, total_dirs: BiggestInt
+            let start_time = getTime()
+            while (getTime() - start_time).inMilliseconds < 500: yield 0 # Init delay.
             for dir in lazy_xtree(path.normalizePathEnd(true).truePath):
-                let files = toSeq(walkFiles(dir / "*"))
-                for file in files: total_size += file.getFileSize; total_files.inc; yield total_size
-                total_dirs.inc                
+                try:
+                    let files = toSeq(walkFiles(dir / "*"))
+                    for file in files: total_size += file.getFileSize; total_files.inc; yield total_size
+                    total_dirs.inc
+                except: discard # FS error = no count.
             let last_pos = feed.getPosition
             if ext_table.len > 0: feed.writeLine(block_sep)
             feed.writeLine(&"Total data size: \a\x06{total_size.by3}\a\x00 bytes")
@@ -873,7 +877,7 @@ when not defined(FileViewer):
             if walker != nil:
                 let start = getTime()
                 for checkpoint in walker:
-                    if (getTime() - start).inMilliseconds > 50: break
+                    if (getTime() - start).inMilliseconds > 25: break
         # Mouse controls.
         let (x, y) = host.pick()
         if self.active:
@@ -885,7 +889,7 @@ when not defined(FileViewer):
                     else: discard
         if MOUSE_Left_Button.IsMouseButtonReleased:
             case picked_control():
-                of FVControls.lense:    cycle_lenses() # Switch view mode on inspector tag click.
+                of FVControls.lense:    cycle_lenses()      # Switch view mode on inspector tag click.
                 of FVControls.minmax:   switch_fullscreen() # Switch between preview & full modes.
                 elif self.active: f_key = fkey_feed(x, y)   # Command buttons picking.
         # Keyboard controls.
