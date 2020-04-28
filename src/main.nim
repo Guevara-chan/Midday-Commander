@@ -753,6 +753,7 @@ when not defined(FileViewer):
         src = ""
         night = false
         cache.setLen 0
+        ticker       = 0
         char_total   = 0
         widest_line  = 0
         line_numbers = false
@@ -875,6 +876,7 @@ when not defined(FileViewer):
             # Deep analyzis.
             if walker != nil:
                 let start = getTime()
+                ticker = (ticker + 1) %% 4
                 for checkpoint in walker:
                     if checkpoint == -1: walker = nil; break
                     if (getTime() - start).inMilliseconds > 25: break
@@ -910,17 +912,15 @@ when not defined(FileViewer):
     method render(self: FileViewer): Area {.discardable.} =
         # Init setup.        
         host.margin = self.margin
-        ticker = (ticker + 1) %% 4
         let peller = if walker.isNil: " " else: $("\\|/-"[ticker])
         proc write_centered(text: string, color: Color) =
             host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
             host.write @[" ", text, " "], color, DARKGRAY
         # Header render.
-
         with host:
             loc(self.margin, 0)
             write if fullscreen: "╘" else: "╒", self.border_clr, self.bg
-            write [" ", lense_id, peller], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
+            write [" ", lense_id, "\a\x09", peller], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
             write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), self.border_clr, self.bg
             write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
             write [if fullscreen: "╛" else: "╕", ""], self.border_clr, self.bg
