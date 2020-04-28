@@ -630,7 +630,7 @@ when not defined(FileViewer):
         walker: iterator:BiggestInt
         fkey_feed: proc(x, y: int): int
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
-        x, y, pos, xoffset, last_line, feedsize, char_total, widest_line, hexpos_edge, f_key: int
+        x, y, pos, xoffset, linecount, feedsize, char_total, widest_line, hexpos_edge, f_key: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
     type FVControls = enum
         none, lense, minmax, lscroll, rscroll
@@ -642,7 +642,6 @@ when not defined(FileViewer):
     # --Properties:
     template feed_avail(self: FileViewer): bool  = not feed.isNil
     template data_piped(self: FileViewer): bool  = feed of StringStream
-    template total_lines(self: FileViewer): int  = (if last_line > -1: last_line else: int.high)
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * 2 + self.fullscreen.int
@@ -753,7 +752,6 @@ when not defined(FileViewer):
         cache.setLen 0
         char_total   = 0
         widest_line  = 0
-        last_line    = -1
         line_numbers = false
         lense_switch = false
         (x, pos, y)  = (0, 0, 0)
@@ -761,16 +759,17 @@ when not defined(FileViewer):
 
     proc pipe(self: FileViewer, text: string, title = "") =
         close()
-        src = title
-        feedsize = text.len
-        feed = text.newStringStream()
+        src         = title
+        feedsize    = text.len
+        linecount   = text.count('\n')
+        feed        = text.newStringStream()
 
     proc open(self: FileViewer, path: string, force = false) =
         if force or path != src: 
             close()
             try: 
                 if path.dirExists: pipe dir_checkout(path)
-                else: feed = path.truePath.newFileStream fmRead; feedsize = path.getFileSize.int
+                else: feed = path.truePath.newFileStream fmRead; feedsize = path.getFileSize.int; linecount = int.high
             except: discard # special case to not use handler to MultiViewer.
         src = path.absolutePath
 
@@ -791,14 +790,14 @@ when not defined(FileViewer):
                 yield ("", "", noise.join "")
 
     proc ascii_lense(self: FileViewer): iterator:ScreenLine =
+        let aligner = cache.len.`$`.len
         var fragment = cache[y..^1]
         fragment.setLen self.vcap
         self.hide_colors = true
-        let aligner = cache.len.`$`.len
         return iterator:ScreenLine = 
             for idx, line in fragment:
                 let lnum = y + idx
-                yield ((if line_numbers and lnum<=self.total_lines and last_line!=0: (lnum+1).`$`.fit_left(aligner)&"|"
+                yield ((if line_numbers and lnum<=self.linecount and linecount!=0: (lnum+1).`$`.fit_left(aligner)&"|"
                 else: ""), "", line.data.subStr(x).dup(removeSuffix("\c\n")))
 
     proc ansi_lense(self: FileViewer): iterator:ScreenLine =
@@ -862,12 +861,12 @@ when not defined(FileViewer):
                     widest_line = max(line.data.len, widest_line)
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
-                    if feed.atEnd: last_line = cache.len-1
+                    if feed.atEnd: linecount = cache.len-1
                     hexpos_edge = (&"{feedsize:X}").len     # Should only be calculated here for performace.
-                    y = max(0, min(y, last_line-self.vcap)) # Post-poned Y position update.
+                    y = max(0, min(y, linecount-self.vcap)) # Post-poned Y position update.
                     if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
-                    (last_line, y, hexpos_edge) = (0, 0, 0)
+                    (linecount, y, hexpos_edge) = (0, 0, 0)
                     if lense_switch: "HEX" else: "ASCII"
             else: "ERROR" # Noise garden.
             # Deep analyzis.
