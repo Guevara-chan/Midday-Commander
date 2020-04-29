@@ -15,6 +15,7 @@ when not defined(Meta):
     template control_down(): bool   = KEY_Left_Control.IsKeyDown()  or KEY_Right_Control.IsKeyDown()
     template shift_down(): bool     = KEY_Left_Shift.IsKeyDown()    or KEY_Right_Shift.IsKeyDown()
     template alt_down(): bool       = KEY_Left_Alt.IsKeyDown()      or KEY_Right_Alt.IsKeyDown()
+    template by3(num: auto): string                                = ($num).insertSep(' ', 3)
     template undot(ext: string): string                            = ext.dup(removePrefix('.'))
     template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
     template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0,size
@@ -123,6 +124,7 @@ when not defined(Meta):
         "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
         "\a\x07Ctrl+\a\x02F4-F7:\a\x01   sort entry list by name/extension/size/modification time ",
         "\a\x07Ctrl+\a\x02Insert:\a\x01  store path to hilited entry into clipboard",
+        "\a\x07Shift+\a\x02F2:\a\x01     display detailed error history",
         "\a\x07Shift+\a\x02F3:\a\x01     view hilited entry in full",
         "\a\x07Shift+\a\x02F7:\a\x01     request symlink creation for hilited entry",
         "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
@@ -421,7 +423,7 @@ when not defined(DirViewer):
             host.write [if entry_id.runeLen>total_width:"…" else:"║","\n"], border_color, DARKBLUE
         # 2nd footline rendering.
         let (stat_feed, clr) = if sel_stat.files > 0 or sel_stat.dirs > 0: (sel_stat, '\x07') else: (dir_stat, '\x05')
-        let total_size = &" \a{clr}{($stat_feed.bytes).insertSep(' ', 3)} bytes in {stat_feed.files} files\a\x01 "
+        let total_size = &" \a{clr}{stat_feed.bytes.by3} bytes in {stat_feed.files} files\a\x01 "
         host.write ["╚", total_size.center(total_width+4, '-').replace("-", "═"), "╝"]
         # Finalization.
         return self
@@ -729,7 +731,6 @@ when not defined(FileViewer):
             subdirs, files, surf_size, hidden_dirs, hidden_files: BiggestInt
             ext_table: CountTable[string]
         const block_sep = "\a\x05" & ".".repeat(22)
-        template by3(num: auto): string = ($num).insertSep(' ', 3)
         # Analyzing loop.
         for record in walkDir(path.normalizePathEnd(true).truePath, checkDir = true): 
             if record.path.dirExists: # Subdir registration.
@@ -1170,7 +1171,8 @@ when not defined(MultiViewer):
         inspect(help.join("\n"), "@HELP").switch_fullscreen(1).switch_lighting(0)
 
     proc show_errorlog(self: MultiViewer) =
-        inspect(errorlog.mapIt(&"\a\x06{$(it.time)}: \a\x08{it.msg.convert(cmd_cp, \"UTF-8\")}").join("\n"), "@ERRORS")
+        inspect(&"{errorlog.len.by3} erors occured since startup.\n\n" &
+            errorlog.mapIt(&"\a\x06{$(it.time)}: \a\x08{it.msg.convert(cmd_cp, \"UTF-8\")}").join("\n"), "@ERRORS")
         .switch_fullscreen(1).switch_lighting(0)
 
     proc switch_inspector(self: MultiViewer) =
@@ -1320,7 +1322,7 @@ when not defined(MultiViewer):
             let (hint_line, enabled) = if self.fullview:  (inspector.hints, inspector.hintmask)
                 elif control_down():                      (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
-                elif shift_down():                        (" | |\x11View\x10| | | |MkLink| | | ",
+                elif shift_down():                        (" |ErrLog|\x11View\x10| | | |MkLink| | | ",
                                                           @[3, 7])
                 else:                                     ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
                                                           @[1, 3, 5, 6, 7, 8, 10])
