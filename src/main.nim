@@ -19,6 +19,13 @@ when not defined(Meta):
     template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
     template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0,size
 
+    proc check_droplist(): seq[string] =
+        if IsFileDropped():
+            var idx, list_size: int32
+            let listing = GetDroppedFiles(list_size.addr)
+            result = collect(newSeq): (for x in 0..<list_size: $listing[x])
+            ClearDroppedFiles()
+
     proc root_dir(path: string): string =
         var child = path
         while true: (if child.parentDir == ".": return child else: child = child.parentDir)
@@ -29,13 +36,6 @@ when not defined(Meta):
                 .filterIt(it!=""):
                     if drive[0] != ' ': result.add drive.subStr(4).strip()
         else: @[]
-
-    proc check_droplist(): seq[string] =
-        if IsFileDropped():
-            var idx, list_size: int32
-            let listing = GetDroppedFiles(list_size.addr)
-            result = collect(newSeq): (for x in 0..<list_size: $listing[x])
-            ClearDroppedFiles()
 
     proc wildcard_replace(path: string, pattern = "*.*"): string =
         let
@@ -107,6 +107,7 @@ when not defined(Meta):
         "\a\x02F8:\a\x01     delete selected entri(s)",
         "\a\x02F10:\a\x01    quit program",
         "\a\x02F11:\a\x01    switch debug info on/off",
+        "\a\x02Alt:\a\x01    switch quicksearch mode on/off",
         "\a\x02Space:\a\x01  confirm alert choice",
         "\a\x02Insert:\a\x01 (un)select hilited entry",
         "\a\x02Home:\a\x01   request new path to browse",
@@ -242,7 +243,13 @@ when not defined(DirViewer):
         scroll_to hline + shift
 
     proc scroll_to_name(self: DirViewer, name: string) =
-        for idx, entry in list: (if entry.name == name: scroll_to idx)
+        for idx, entry in list: 
+            if entry.name == name: scroll_to idx; break
+
+    proc scroll_to_prefix(self: DirViewer, prefix: string) =
+        if prefix == "": return
+        for idx, entry in list: 
+            if entry.name.startsWith(prefix): scroll_to idx; break
 
     template sorter_base(comparator: untyped, invertor = false) =
         return if x.name == ParDir:     -1
@@ -351,7 +358,7 @@ when not defined(DirViewer):
         elif MOUSE_Right_Button.IsMouseButtonReleased: (if pickindex < list.len: switch_selection pickindex)# RB=select
         elif MOUSE_Left_Button.IsMouseButtonDown:      # HL items if left button down.
             if pickindex != self.hline and pickindex < list.len and pickindex >= 0: scroll_to pickindex
-        # Kbd controls.
+        # Kbd controls.        
         self.show_repr = KEY_Delete.IsKeyDown()
         if   KEY_Insert.IsKeyPressed and control_down(): self.hpath.SetClipboardText
         elif KEY_Up.IsKeyDown:        (if norepeat(): scroll -1)
@@ -431,17 +438,18 @@ when not defined(CommandLine):
         log:    seq[string]
         shell:  Process
         origin: int
-        fullscreen: bool
         dir_feed:   proc(): DirViewer
         prompt_cb:  proc(name: string)
         input, prompt: string
+        fullscreen, through_req, input_changed: bool
     const 
         max_log = 99999
         exit_hint = " ESC to return "
 
     # --Properties:
-    template running(self: CommandLine): bool   = not self.shell.isNil and self.shell.running
-    template exclusive(self: CommandLine): bool = self.running or self.fullscreen
+    template running(self: CommandLine): bool    = not self.shell.isNil and self.shell.running
+    template exclusive(self: CommandLine): bool  = self.running or self.fullscreen
+    template requesting(self: CommandLine): bool = self.prompt != ""
 
     # --Methods goes here:
     proc scroll(self: CommandLine, shift: int) =
@@ -463,18 +471,24 @@ when not defined(CommandLine):
         input = ""
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
-        if prompt == "": prompt = hint; input = def_input; prompt_cb = cb
+        if not self.requesting: prompt = hint; input = def_input; prompt_cb = cb
 
     proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
         request hint, "", cb
 
+    proc through_request(self: CommandLine, hint: string) =
+        proc void(faux: string) = discard
+        request(hint, void); through_req = true
+
     proc end_request(self: CommandLine) =
-        prompt = ""; input = "";
+        prompt = ""; input = ""; through_req = false
 
     proc paste(self: CommandLine, text: string) =
-        input &= text
+        input &= text; input_changed = true
 
     method update(self: CommandLine): Area {.discardable.} =
+        # Init setup.
+        input_changed = false
         # Service controls.
         let (x, y) = host.pick()
         if y == 0 and x >= host.hlines - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
@@ -494,10 +508,11 @@ when not defined(CommandLine):
             elif KEY_Pause.IsKeyPressed:  (if self.running: shell.kill)
         else: # Input controls.
             if input != "": # Backspace only if there are text to remove.
-                if KEY_Backspace.IsKeyDown: (if norepeat(): input = input.runeSubstr(0, input.runeLen-1))
-            if KEY_Enter.IsKeyPressed: # Input actualization.
-                if prompt != "": prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
-            elif KEY_Pause.IsKeyPressed and prompt != "": end_request(); abort() # Cancel request mode.
+                if KEY_Backspace.IsKeyDown: # Delete last char.
+                    if norepeat(): input = input.runeSubstr(0, input.runeLen-1); input_changed = true
+            if KEY_Enter.IsKeyPressed and not through_req: # Input actualization.
+                if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
+            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort() # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed: paste $GetClipboardText(); abort()
             let key = GetKeyPressed()
             if key > 0: paste($(key.Rune))
@@ -513,7 +528,8 @@ when not defined(CommandLine):
         # Commandline.
         host.margin = 0
         host.write "\n"
-        if prompt != "": host.write [prompt, "\a\x06"], BLACK, ORANGE
+        if self.requesting: host.write [prompt, if through_req: "\a\x09" else: "\a\x06"], BLACK, 
+            if through_req: PURPLE else: ORANGE
         else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
         let prefix_len = host.hpos() + 2 # 2 - for additonal symbol and pointer.
         let full_len = prefix_len + input.runeLen
@@ -980,28 +996,28 @@ when not defined(FileViewer):
 # -------------------- #
 when not defined(MultiViewer):
     type MultiViewer = ref object of Area
-        host:    TerminalEmu
-        viewers: seq[DirViewer]
-        cmdline: CommandLine
-        error:   tuple[msg: string, time: Time]
-        dirty:   bool
+        host:      TerminalEmu
+        viewers:   seq[DirViewer]
+        cmdline:   CommandLine
+        error:     tuple[msg: string, time: Time]
         inspector: FileViewer
-        watcher: ProgressWatch
+        watcher:   ProgressWatch
         current, f_key: int
+        dirty, quick_search: bool
     const hint_width  = 6
 
     # --Properties:
-    template active(self: MultiViewer): DirViewer       = self.viewers[self.current]
-    template next_index(self: MultiViewer): int         = (self.current+1) %% self.viewers.len
-    template next_viewer(self: MultiViewer): DirViewer  = self.viewers[self.next_index]
-    template next_path(self: MultiViewer): string       = self.next_viewer.path
-    template inspecting(self: MultiViewer): bool        = not inspector.isNil
-    template inspected_path(self: MultiViewer): string  = (if self.inspecting: self.inspector.src else: "")
-    template previewing(self: MultiViewer): bool        = self.inspecting and not self.inspector.fullscreen
-    template fullview(self: MultiViewer): bool          = self.inspecting and self.inspector.fullscreen
-    template hint_prefix(self: MultiViewer): string     = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
-    template hint_cellwidth(self: MultiViewer): int     = hint_width + self.hint_prefix.runeLen + 1
-    template hint_margin(self: MultiViewer): int        = (host.hlines - (self.hint_cellwidth.float * 10.5).int) div 2
+    template active(self: MultiViewer): DirViewer      = self.viewers[self.current]
+    template next_index(self: MultiViewer): int        = (self.current+1) %% self.viewers.len
+    template next_viewer(self: MultiViewer): DirViewer = self.viewers[self.next_index]
+    template next_path(self: MultiViewer): string      = self.next_viewer.path
+    template inspecting(self: MultiViewer): bool       = not inspector.isNil
+    template inspected_path(self: MultiViewer): string = (if self.inspecting: self.inspector.src else: "")
+    template previewing(self: MultiViewer): bool       = self.inspecting and not self.inspector.fullscreen
+    template fullview(self: MultiViewer): bool         = self.inspecting and self.inspector.fullscreen
+    template hint_prefix(self: MultiViewer): string    = " ".repeat(host.hlines div 11 - hint_width - 1) & "F"
+    template hint_cellwidth(self: MultiViewer): int    = hint_width + self.hint_prefix.runeLen + 1
+    template hint_margin(self: MultiViewer): int       = (host.hlines - (self.hint_cellwidth.float * 10.5).int) div 2
 
     # --Methods goes here:
     proc select(self: MultiViewer, idx: int = 0) =
@@ -1192,6 +1208,12 @@ when not defined(MultiViewer):
                 if x in view.xoffset..view.xoffset+view.viewer_width: return idx
         return -1
 
+    proc switch_quick_search(self: MultiViewer, new_state = -1) =
+        let end_state = if new_state == -1: not quick_search else: new_state.bool
+        quick_search = if end_state and not cmdline.requesting: cmdline.through_request("\x13Search"); true
+            elif not end_state: cmdline.end_request();                                                 false
+            else: quick_search # No changes.
+
     method update(self: MultiViewer): Area {.discardable.} =
         f_key = 0 # F-key emulator.
         try:
@@ -1238,6 +1260,9 @@ when not defined(MultiViewer):
                 elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
+                elif KEY_Left_Alt.IsKeyPressed or KEY_Right_Alt.IsKeyPressed: switch_quick_search()
+                # Quick search update.
+                if quick_search and cmdline.input_changed: self.active.scroll_to_prefix cmdline.input
                 # File viewer update.
                 let start = getTime()
                 if self.inspecting:
