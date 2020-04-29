@@ -350,7 +350,7 @@ when not defined(DirViewer):
             else: clicker = getTime()
         elif MOUSE_Right_Button.IsMouseButtonReleased: (if pickindex < list.len: switch_selection pickindex)# RB=select
         elif MOUSE_Left_Button.IsMouseButtonDown:      # HL items if left button down.
-            if pickindex != self.hline and pickindex < list.len: scroll_to pickindex
+            if pickindex != self.hline and pickindex < list.len and pickindex >= 0: scroll_to pickindex
         # Kbd controls.
         self.show_repr = KEY_Delete.IsKeyDown()
         if   KEY_Insert.IsKeyPressed and control_down(): self.hpath.SetClipboardText
