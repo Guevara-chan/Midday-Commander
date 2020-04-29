@@ -134,11 +134,11 @@ when not defined(Meta):
 when not defined(DirEntry):
     type DirEntryDesc = tuple[id: string, metrics: string, time_stamp: string, coloring: Color]
     type DirEntry = object
-        name: string
-        kind: PathComponent
-        size: BiggestInt
+        name:  string
+        kind:  PathComponent
+        size:  BiggestInt
         mtime: Time
-        memo: DirEntryDesc
+        memo:  DirEntryDesc
         selected, hidden: bool
     const direxit = DirEntry(name: ParDir, kind: pcDir)
     const dirrepr = DirEntry(name: $CurDir, kind: pcDir)
@@ -195,7 +195,7 @@ when not defined(DirViewer):
         dirty, active, visible, hl_changed, inverse_sort, show_repr: bool
         hline, origin, xoffset, file_count, name_col, size_col, date_col, total_width, viewer_width: int
         sorters: seq[proc(x: DirEntry, y: DirEntry): int]
-        sorter: SortCriteria
+        sorter:  SortCriteria
     const
         hdr_height      = 2
         foot_height     = 3
@@ -654,12 +654,12 @@ when not defined(FileViewer):
     type DataLine   = tuple[origin: int, data: string]
     type ScreenLine = tuple[prefix: string, colored: string, raw: string]
     type FileViewer = ref object of Area
-        host: TerminalEmu
-        feed: Stream
+        host:  TerminalEmu
+        feed:  Stream
         cache: seq[DataLine]
         src, lense_id: string
-        walker: iterator:BiggestInt
-        fkey_feed: proc(x, y: int): int
+        walker:        iterator:BiggestInt
+        fkey_feed:     proc(x, y: int): int
         fullscreen, lense_switch, hide_colors, night, line_numbers: bool
         x, y, pos, xoffset, linecount, feedsize, char_total, widest_line, hexpos_edge, ticker, f_key: int
         lenses: Table[string, proc(fv: FileViewer): iterator:ScreenLine]
@@ -995,11 +995,13 @@ when not defined(FileViewer):
         return nil
 # -------------------- #
 when not defined(MultiViewer):
+    type ErrRecord   = tuple[msg: string, time: Time]
     type MultiViewer = ref object of Area
         host:      TerminalEmu
         viewers:   seq[DirViewer]
         cmdline:   CommandLine
-        error:     tuple[msg: string, time: Time]
+        error:     ErrRecord
+        errorlog:  seq[ErrRecord]
         inspector: FileViewer
         watcher:   ProgressWatch
         current, f_key: int
@@ -1035,6 +1037,10 @@ when not defined(MultiViewer):
         if y == host.vlines-1:
             let index = (x-(self.hint_prefix.runeLen + self.hint_margin - 1)) / self.hint_cellwidth + 1
             if index-index.int.float < (1.1-0.1*(self.hint_prefix.runeLen).float): return index.int
+
+    proc register_err(self: MultiViewer, err: ref Exception) =
+        error = (msg: err.msg, time: getTime())
+        errorlog.add(error)
 
     proc reset_watcher(self: MultiViewer) =
         watcher = newProgressWatch(host, self)
@@ -1163,6 +1169,10 @@ when not defined(MultiViewer):
     proc show_help(self: MultiViewer) =
         inspect(help.join("\n"), "@HELP").switch_fullscreen(1).switch_lighting(0)
 
+    proc show_errorlog(self: MultiViewer) =
+        inspect(errorlog.mapIt(&"\a\x06{$(it.time)}: \a\x08{it.msg.convert(cmd_cp, \"UTF-8\")}").join("\n"), "@ERRORS")
+        .switch_fullscreen(1).switch_lighting(0)
+
     proc switch_inspector(self: MultiViewer) =
         if self.inspecting: uninspect() else: inspect()
 
@@ -1243,6 +1253,7 @@ when not defined(MultiViewer):
                     elif f_key==6 or KEY_F6.IsKeyPressed: switch_sorter SortCriteria.mtime
                 # Hint controls (shift+).
                 elif shift_down():
+                    if   f_key==2 or KEY_F2.IsKeyPressed: show_errorlog()
                     if   f_key==3 or KEY_F3.IsKeyPressed: switch_inspector_fs()
                     elif f_key==7 or KEY_F7.IsKeyPressed: request_new_link()
                 # Hint controls (vanilla).
@@ -1280,7 +1291,8 @@ when not defined(MultiViewer):
             # Finalization.
             if (getTime() - error.time).inSeconds > 2: error.msg = ""
         except: # Error message
-            error = (msg: getCurrentExceptionMsg().splitLines[0], time: getTime())
+            register_err(getCurrentException())        
+            #error = (msg: getCurrentExceptionMsg().splitLines[0], time: getTime())
             for viewer in viewers: (if viewer.dirty: viewer.refresh().scroll_to(viewer.hline))        
         host.limit_fps(if host.focused: 60 else: 5)
         return self
@@ -1300,7 +1312,7 @@ when not defined(MultiViewer):
         if cmdline.exclusive: return
         # Hints.
         if error.msg != "": # Error message.
-            host.write error.msg.fit(host.hlines+1), BLACK, MAROON
+            host.write error.msg.splitLines[0].fit(host.hlines+1), BLACK, MAROON
         else: # Hot keys.
             var idx: int
             if self.fullview: f_key = inspector.f_key
