@@ -58,8 +58,8 @@ when not defined(Meta):
             return true
         let 
             (dir, name, ext) = path.splitFile
-            mask = pattern.splitFile
-        return name.match_part(mask.name) and ext.undot.match_part(mask.ext.undot)
+            mask = pattern.s_plitFile
+        return name.matchpart(mask.name) and ext.undot.match_part(mask.ext.undot)
 
     proc truePath(path: string, follow_symlink = true): string =
         when defined(windows):
@@ -87,6 +87,11 @@ when not defined(Meta):
             checklist.setLen 0
             checklist.add volatile
             volatile.setLen 0
+
+    proc remove_dir_ex(path: string, tick: proc(now_processing: string)) =
+        for (kind, path) in walkDir(path):
+            tick(path); if path.fileExists: path.removeFile else: path.remove_dir_ex(tick)
+        tick(path); path.removeDir
 
     # --Data:
     const help = @[
@@ -571,8 +576,9 @@ when not defined(Alert):
 # -------------------- #
 when not defined(ProgressWatch):
     type ProgressWatch = ref object of Area
-        host:  TerminalEmu
-        start: Time
+        host:   TerminalEmu
+        status: string
+        start, frame_start: Time
         cancelled, frameskip: bool
     const cancel_hint = " ESC to cancel │"
 
@@ -582,6 +588,11 @@ when not defined(ProgressWatch):
     # --Methods goes here:
     proc cancel(self: ProgressWatch) =
         cancelled = true; abort("Progress tracking was cancelled by user.")
+
+    proc tick(self: ProgressWatch, status: string) =
+        self.status = status
+        if (getTime() - frame_start).inMilliseconds >= (1000 div host.max_fps): 
+            host.update self; frame_start = getTime()
 
     method update(self: ProgressWatch): Area {.discardable.} =
         let (x, y) = host.pick()
@@ -595,9 +606,13 @@ when not defined(ProgressWatch):
         parent.render()
         if frameskip: frameskip = false; return self
         if self.elapsed.inMilliseconds < 100: return self
+        # Status render.
+        if status != "":
+            host.loc((host.hlines - status.runeLen) div 2, 0)
+            host.write status, Purple, DarkGray
         # Timeline render.
         let midline = host.vlines div 2 - 1
-        for y in 0..host.vlines-2: 
+        for y in (status!="").int..host.vlines-2: 
             let 
                 shift  = self.elapsed.inSeconds + 1 * (y - midline)
                 time   = initDuration(seconds = 0.int64.max(shift))
@@ -1095,11 +1110,8 @@ when not defined(MultiViewer):
             sync self.active
 
     proc delete(self: MultiViewer) =
-        # Service proc.
-        proc deleter(victim: string, is_dir: bool): ref Exception =
-            try: 
-                if is_dir: victim.removeDir(true) else: victim.removeFile()
-            except: return getCurrentException()
+        # Init setup.
+        proc tick(now_processing: string) = watcher.tick now_processing # aux binding
         reset_watcher()
         # Deffered finalization.
         defer:
@@ -1112,7 +1124,8 @@ when not defined(MultiViewer):
                 let victim = self.active.path / entry.name
                 if self.inspected_path == victim: inspector.close()
                 if victim == self.active.path: self.active.chdir direxit.name
-                wait_task spawn victim.deleter(entry.is_dir)
+                if entry.is_dir: victim.remove_dir_ex(tick) else: tick(victim); victim.removeFile()
+                #wait_task spawn victim.deleter(entry.is_dir)
             else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
 
