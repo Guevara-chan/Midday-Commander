@@ -578,8 +578,8 @@ when not defined(Alert):
         host.margin = 0
         let delim = "█ ".repeat host.hlines div 2
         with host:
-            loc(0, self.ypos)        
-            write [delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", " ".center(host.hlines), "\n\a\x03", 
+            loc(0, self.ypos)
+            write [delim, "\n\a\x03", "[X]".center(host.hlines), "\n\a\x06", " ".center(host.hlines), "\n\a\xff", 
                 "<Yes/No>".center(host.hlines), "\n\a\x08 ", delim], MAROON, BLACK
             loc((host.hlines - msg_len) div 2, self.ypos + 2)
             write message
@@ -753,7 +753,7 @@ when not defined(FileViewer):
                     total_dirs.inc
                 except: discard # FS error = no count.
             if ext_table.len > 0: feed.writeLine(block_sep)
-            feed.writeLine(&"Total data size: \a\x06{total_size.by3}\a\x00 bytes")
+            feed.writeLine(&"Total data size: \a\x06{total_size.by3}\a\xff bytes")
             feed.writeLine(&"Total sub-directories: \a\x06{(total_dirs-1).by3}")
             feed.writeLine(&"Total files: \a\x06{total_files.by3}")
             feed.setPosition feedsize # Tracing pos back for new stuff to get readen.
@@ -773,9 +773,9 @@ when not defined(FileViewer):
             widest_hdr = max(path_hdr.len, link_hdr.len)
         return [join([&"{path_hdr.alignLeft(widest_hdr, ' ')}|", # Getting border to widest header.
                 if path.symlinkExists: &"{link_hdr.alignLeft(widest_hdr, ' ')}|" else: ""].filterIt(it != ""), "\n"),
-            "\a\x05" & "=".repeat(widest_hdr-4) & "/", "", &"Surface data size: \a\x06{surf_size.by3}\a\x00 bytes", 
-            &"Sub-directories: \a\x06{subdirs.by3}\a\x00 (\a\x09{hidden_dirs.by3}\a\x00 hidden)",
-            &"Files: \a\x06{files.by3}\a\x00 (\a\x09{hidden_files.by3}\a\x00 hidden)", block_sep, ext_sum.join("\n")
+            "\a\x05" & "=".repeat(widest_hdr-4) & "/", "", &"Surface data size: \a\x06{surf_size.by3}\a\xff bytes", 
+            &"Sub-directories: \a\x06{subdirs.by3}\a\xff (\a\x09{hidden_dirs.by3}\a\xff hidden)",
+            &"Files: \a\x06{files.by3}\a\xff (\a\x09{hidden_files.by3}\a\xff hidden)", block_sep, ext_sum.join("\n")
         ].join("\n")
 
     proc close(self: FileViewer): FileViewer {.discardable.} =
@@ -1171,8 +1171,9 @@ when not defined(MultiViewer):
         inspect(help.join("\n"), "@HELP").switch_fullscreen(1).switch_lighting(0)
 
     proc show_errorlog(self: MultiViewer) =
-        inspect(&"{errorlog.len.by3} erors occured since startup.\n\n" &
-            errorlog.mapIt(&"\a\x06{$(it.time)}: \a\x08{it.msg.convert(cmd_cp, \"UTF-8\")}").join("\n"), "@ERRORS")
+        inspect(&"\a\x06{errorlog.len.by3}\a\xff erorrs occured since startup.\n\n" &
+            errorlog.mapIt("\a\x09[" & it.time.local.format("HH:mm:ss") & 
+                &"] \a\x08{it.msg.convert(cmd_cp, \"UTF-8\")}").join("\n"), "@ERRORS")
         .switch_fullscreen(1).switch_lighting(0)
 
     proc switch_inspector(self: MultiViewer) =
@@ -1323,7 +1324,7 @@ when not defined(MultiViewer):
                 elif control_down():                      (" | |byName|byExt|bySize|byModi| | | | ",
                                                           @[3, 4, 5, 6])
                 elif shift_down():                        (" |ErrLog|\x11View\x10| | | |MkLink| | | ",
-                                                          @[3, 7])
+                                                          @[2, 3, 7])
                 else:                                     ("Help|Menu|View|Edit|Copy|RenMov|MkDir|Delete|PullDn|Quit",
                                                           @[1, 3, 5, 6, 7, 8, 10])
             for hint in hint_line.split("|"):

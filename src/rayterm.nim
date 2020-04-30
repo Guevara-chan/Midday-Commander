@@ -1,5 +1,5 @@
 import os, strutils, times, sequtils, strformat, sugar, raylib
-from unicode import Rune, runes, runeLen, `==`, `$`
+from unicode import Rune, runes, runeAt, runeLen, `==`, `$`
 {.this: self.}
 {.experimental.}
 
@@ -49,37 +49,43 @@ when not defined(TerminalEmu):
 
     proc write*(self: TerminalEmu, txt: string, fg_init = Color(), bg_init = Color(); raw = false) =
         # Init setup.
-        var ctrl: bool
         if fg_init.a > 0.uint8: fg = fg_init
         if bg_init.a > 0.uint8: bg = bg_init
-        # Buffering.
-        var chunks: seq[string]
-        if not raw: # Buffering with control characters.            
-            var buffer: string
-            for chr in txt.runes:
-                if chr.int > 31: buffer &= $chr
-                else: 
-                    if buffer != "": chunks.add buffer
-                    buffer = ""
-                    chunks.add $chr
-            if buffer != "": chunks.add buffer
-        else: chunks = @[txt.replace('\n', ' ').replace('\0', ' ')]
-        # Char render loop.
-        for chunk in chunks:
+        var
+            ctrl: bool
+            fg_stack = @[fg]
+        # Render template.
+        template render_rext(chunk: string) =
             if ctrl:                                         # Control arg.
-                fg = palette[chunk[0].int]
+                if chunk.runeAt(0).int != 160:
+                    fg = palette[chunk[0].int]
+                    fg_stack.add(self.fg)
+                elif fg_stack.len > 0: discard fg_stack.pop; fg = fg_stack[^1]
                 ctrl = false
             elif chunk[0] == '\a' and not raw: ctrl = true   # Control character.
             elif raw or chunk[0] != '\n':
                 let width = cell.x * chunk.runeLen.float
-                cur.DrawRectangleV(Vector2(x: width, y: cell.y), bg)
-                if chunk != " ": font.DrawTextEx(chunk, cur, font.baseSize.float32, 0, fg)
+                cur.DrawRectangleV(Vector2(x: width, y: cell.y), self.bg)
+                font.DrawTextEx(chunk, self.cur, self.font.baseSize.float32, 0, self.fg)
                 cur.x += width
-            else: loc_precise(margin * cell.x.int, (cur.y + cell.y).int) # new line.
+            else: loc_precise(self.margin * cell.x.int, (cur.y + cell.y).int) # new line.
+        # Parsing.
+        if not raw: # Parsing with control characters.
+            var 
+                buffer: string
+                breaker: bool
+            for chr in txt.runes:
+                if chr != '\a'.Rune and chr != '\n'.Rune and not breaker: buffer &= $chr
+                else:
+                    breaker = chr == '\a'.Rune
+                    if buffer != "": render_rext buffer
+                    buffer = ""
+                    render_rext $chr
+            if buffer != "": render_rext buffer
+        else: render_rext txt.multiReplace(("\n", " "), ("\0", " "))
 
     proc write*(self: TerminalEmu, chunks: open_array[string], fg_init = Color(), bg_init = Color(), raw = false) =
-        write "", fg_init, bg_init
-        for chunk in chunks: write chunk, raw=raw
+        write chunks.join(""), fg_init, bg_init, raw
 
     proc pick*(self: TerminalEmu, x = GetMouseX(), y = GetMouseY()): auto =
         (x div cell.x.int, y div cell.y.int)
