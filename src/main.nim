@@ -100,7 +100,7 @@ when not defined(Meta):
         "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
         "\a\x01===================================================================================",
         "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
-        "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\x01 to return)",
+        "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\xff to return)",
         "\a\x02F3:\a\x01     switch preview mode on/off",
         "\a\x02F5:\a\x01     copy selected entri(s)",
         "\a\x02F6:\a\x01     request moving selected entri(s) with optional renaming",
@@ -1171,7 +1171,7 @@ when not defined(MultiViewer):
         inspect(help.join("\n"), "@HELP").switch_fullscreen(1).switch_lighting(0)
 
     proc show_errorlog(self: MultiViewer) =
-        inspect(&"\a\x06{errorlog.len.by3}\a\xff erorrs occured since startup.\n\n" &
+        inspect(&"\a\x06{errorlog.len.by3}\a\xff erorrs occured since startup (\a\x02ESC\a\xff to return).\n\n" &
             errorlog.mapIt("\a\x09[" & it.time.local.format("HH:mm:ss") & 
                 &"] \a\x08{it.msg.convert(cmd_cp, \"UTF-8\")}").join("\n"), "@ERRORS")
         .switch_fullscreen(1).switch_lighting(0)
