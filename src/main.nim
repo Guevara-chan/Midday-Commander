@@ -389,9 +389,9 @@ when not defined(DirViewer):
             write ["╔", "═".repeat(total_width), "╗"], border_color, DARKBLUE
             loc((total_width - self.path_limited.runeLen) div 2 + xoffset, host.vpos())
             write [" ", self.path_limited, " \n"], (if active: hl_color else: direxit.coloring), DARKGRAY
-            write ["║\a\x02", "Name".sort_mark(SortCriteria.ext, "/ext*").center(name_col), "\a\x01│\a\x02", 
-                "Size".sort_mark(SortCriteria.size).center(size_col), "\a\x01│\a\x02",
-                    "Modify time".sort_mark(SortCriteria.mtime).center(date_col), "\a\x01║\n"], border_color, DARKBLUE
+            write ["║\a\x02", "Name".sort_mark(SortCriteria.ext, "/ext*").center(name_col), "\a\x01│\a\xff", 
+                "Size".sort_mark(SortCriteria.size).center(size_col), "\a\x01│\a\xff",
+                    "Modify time".sort_mark(SortCriteria.mtime).center(date_col), "\a\xff║\n"], border_color, DARKBLUE
         # List rendering.
         for idx, entry in self.render_list:
             let desc = cache_desc(idx)
