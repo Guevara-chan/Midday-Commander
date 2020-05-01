@@ -1220,7 +1220,7 @@ when not defined(MultiViewer):
 
     proc request_sel_management(self: MultiViewer, new_state = true) =
         cmdline.request "Input " & (if new_state: "" else: "un") & "selection pattern \a\x03<*.*>", (pattern:string) =>
-            self.manage_selection(pattern, new_state)
+            self.manage_selection(pattern.strip(false, true), new_state)
 
     proc pick_viewer(self: MultiViewer, x = GetMouseX(), y = GetMouseY()): int =
         if y < host.vlines - service_height:
