@@ -8,7 +8,7 @@ const default_palette* = [
   LIME,      # \a\x04
   LIGHTGRAY, # \a\x05
   ORANGE,    # \a\x06
-  YELLOW,   # \a\x07
+  YELLOW,    # \a\x07
   MAROON,    # \a\x08
   PURPLE,    # \a\x09
   BEIGE,     # \a\x0A

@@ -199,9 +199,9 @@ when not defined(DirViewer):
         if sel.len > 1 or sel[0].name != direxit.name: return true
 
     iterator render_list(self: DirViewer): tuple[index: int, val: DirEntry] =
-            var fragment: seq[DirEntry] = list[origin..^1]
-            fragment.setLen(self.capacity)
-            for idx, entry in fragment: yield (origin+idx, entry)
+        var fragment: seq[DirEntry] = list[origin..^1]
+        fragment.setLen(self.capacity)
+        for idx, entry in fragment: yield (origin+idx, entry)
 
     # --Methods goes here:
     proc scroll_to(self: DirViewer, pos = 0): auto {.discardable.} =
@@ -221,7 +221,8 @@ when not defined(DirViewer):
     proc scroll_to_prefix(self: DirViewer, prefix: string) =
         if prefix == "": return
         for idx, entry in list: 
-            if entry.name.startsWith(prefix): scroll_to idx; break
+            if prefix.len <= entry.name.len and prefix.cmpPaths(entry.name.runeSubstr(0, prefix.len)) == 0:
+                scroll_to idx; break
 
     template sorter_base(comparator: untyped, invertor = false) =
         return if x.name == ParDir:     -1
