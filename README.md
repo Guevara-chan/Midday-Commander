@@ -17,3 +17,4 @@ Compilation can be achieved through automated build script provided as `release.
 
 # •Brief sampling of retrofuture management•
 ![Main](https://user-images.githubusercontent.com/8768470/79723245-16871400-82ee-11ea-8333-6add94eda3aa.png)
+![QuickView](https://user-images.githubusercontent.com/8768470/80788757-a8b2d600-8b92-11ea-94df-af0d49168e74.png)
