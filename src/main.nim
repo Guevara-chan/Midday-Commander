@@ -96,12 +96,10 @@ when not defined(Meta):
 
     proc transfer_dir(src, dest: string; destructive: bool, tick: proc(now_processing: string)) =
         dest.createDir
-        var tframe = getTime()
         for (kind, path) in walkDir(src):
             let dest = dest / path.extractFilename
             if path.fileExists:
-                if (getTime() - tframe).inMilliseconds > 100: tick(src); tframe = getTime()
-                if destructive: path.moveFile dest else: path.copyFile dest
+                tick(path); if destructive: path.moveFile dest else: path.copyFile dest
             else: path.transfer_dir(dest, destructive, tick)
         tick(src); if destructive: src.removeDir
 
@@ -619,8 +617,8 @@ when not defined(ProgressWatch):
         cancelled = true; abort("Progress tracking was cancelled by user.")
 
     proc tick(self: ProgressWatch, status: string) =
-        self.status = status
-        if (getTime() - frame_start).inMilliseconds >= (1000 div host.max_fps): 
+        if (getTime() - frame_start).inMilliseconds >= 50:
+            self.status = status
             host.update self; frame_start = getTime()
 
     method update(self: ProgressWatch): Area {.discardable.} =
