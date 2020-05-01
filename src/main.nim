@@ -1,6 +1,6 @@
 import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import std/with, winlean, threadpool, rayterm, raylib
+import std/with, winlean, rayterm, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -69,7 +69,7 @@ when not defined(Meta):
             let
                 handle = createFileW(newWideCString(path), 0'i32, 0'i32, nil, OPEN_EXISTING, 
                     FILE_FLAG_BACKUP_SEMANTICS or (FILE_FLAG_OPEN_REPARSE_POINT * (1-follow_symlink.int)), 0)
-                length = GetFinalPathNameByHandle(handle, nil, 0, 0)
+                length = GetFinalPathNameByHandle(handle, newWideCString(" "), 0, 0)
                 buffer = newWideCString(" ".repeat(length))
             defer: discard closeHandle(handle)
             if length == 0: return path
@@ -93,6 +93,15 @@ when not defined(Meta):
         for (kind, path) in walkDir(path):
             tick(path); if path.fileExists: path.removeFile else: path.remove_dir_ex(tick)
         tick(path); path.removeDir
+
+    proc transfer_dir(src, dest: string; destructive: bool, tick: proc(now_processing: string)) =
+        dest.createDir
+        for (kind, path) in walkDir(src):
+            let dest = dest / path.extractFilename
+            tick(path); if path.fileExists:                
+                if destructive: path.moveFile dest else: path.copyFile dest
+            else: path.transfer_dir dest, destructive, tick
+        tick(src); if destructive: src.removeDir
 
     # --Data:
     const help = @[
@@ -1041,15 +1050,10 @@ when not defined(MultiViewer):
 
     proc register_err(self: MultiViewer, err: ref Exception) =
         error = (msg: err.msg, time: getTime())
-        errorlog.add(error)
+        if not (err of ReraiseError): errorlog.add(error)
 
     proc reset_watcher(self: MultiViewer) =
         watcher = newProgressWatch(host, self)
-
-    proc wait_task(self: MultiViewer, task: FlowVar[ref Exception]) =
-        while not task.isReady: host.update watcher
-        let error = ^task
-        if not error.isNil: raise error
 
     proc warn(self: MultiViewer, message: string): int =
         if not watcher.isNil: watcher.frameskip = true
@@ -1058,19 +1062,15 @@ when not defined(MultiViewer):
     proc navigate(self: MultiViewer, path: string) =
         discard self.active.chdir path
 
-    proc transfer(self: MultiViewer; src, dest: string; dir_proc, file_proc: proc(src, dest: string)): bool =
-        # Service proc.
-        proc transferrer(src, dest: string, dir_proc, file_proc: proc(src, dest: string)): ref Exception =
-            try: 
-                if src.dirExists: src.dir_proc(dest) else: src.file_proc(dest)
-            except: return getCurrentException()
-        # Actual transfer.
+    proc transfer(self: MultiViewer; src, dest: string; file_proc: proc(src, dest: string), destructive=false): bool =
+        proc tick(now_processing: string) = watcher.tick now_processing # aux binding.        
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn(&"Are you sure want to overwrite \n{dest.extractFilename}\n") > 0:
-                wait_task spawn src.transferrer(dest, dir_proc, file_proc)
+                if src.dirExists: src.transfer_dir(dest, destructive, tick)#; sync()
+                else: tick(src); src.file_proc(dest)
                 return true
 
-    template sel_transfer(self: MultiViewer; dir_proc, file_proc: untyped; destructive = false; ren_pattern = "") =
+    template sel_transfer(self: MultiViewer, file_proc: untyped, destructive = false, ren_pattern = "") =
         # Init setup.
         var 
             last_transferred: string
@@ -1088,8 +1088,9 @@ when not defined(MultiViewer):
                 let src = self.active.path / entry.name
                 let dest = self.next_path / src.extractFilename.wildcard_replace(
                     if ren_pattern != "": ren_pattern else: "*.*")
-                if src != self.next_path and transfer(src, dest, dir_proc, file_proc): # Setting 'dirty' flags.
-                    self.next_viewer.dirty = true
+                echo dest
+                if (not self.next_path.startsWith src) and transfer(src, dest, file_proc, destructive):
+                    self.next_viewer.dirty = true # Setting 'dirty' flags.
                     if destructive: self.active.dirty = true
                     last_transferred = dest.extractFilename
             if sel_indexes.len > 0 and (entry.name == direxit.name or not destructive): # Selection removal.
@@ -1114,11 +1115,11 @@ when not defined(MultiViewer):
         return inspector
        
     proc copy(self: MultiViewer) =
-        if self.active.path != self.next_path: sel_transfer(self, copyDir, copyFile)
+        if self.active.path != self.next_path: sel_transfer(self, copyFile)
 
     proc move(self: MultiViewer, ren_pattern = "") =
         let src_viewer = self.active
-        sel_transfer(self, moveDir, moveFile, true, ren_pattern)
+        sel_transfer(self, moveFile, true, ren_pattern)
         src_viewer.refresh()
 
     proc new_dir(self: MultiViewer, name: string) =
@@ -1148,7 +1149,6 @@ when not defined(MultiViewer):
                 if self.inspected_path == victim: inspector.close()
                 if victim == self.active.path: self.active.chdir direxit.name
                 if entry.is_dir: victim.remove_dir_ex(tick) else: tick(victim); victim.removeFile()
-                #wait_task spawn victim.deleter(entry.is_dir)
             else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
 
@@ -1163,7 +1163,7 @@ when not defined(MultiViewer):
                 sync self.active
         # Receiver loop.
         for src in list:
-            if transfer(src, self.active.path / src.extractFilename, copyDir, copyFile): 
+            if transfer(src, self.active.path / src.extractFilename, copyFile):
                 last_transferred = src.extractFilename
                 self.active.dirty = true
 

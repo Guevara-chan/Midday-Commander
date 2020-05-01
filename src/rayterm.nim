@@ -57,10 +57,11 @@ when not defined(TerminalEmu):
         # Render template.
         template render_rext(chunk: string) =
             if ctrl:                                         # Control arg.
-                if chunk.runeAt(0).int != 160:
+                let lead = chunk.runeAt(0).int 
+                if lead != 255 and lead != 160:
                     fg = palette[chunk[0].int]
                     fg_stack.add(self.fg)
-                elif fg_stack.len > 0: discard fg_stack.pop; fg = fg_stack[^1]
+                elif fg_stack.len > 1: discard fg_stack.pop; fg = fg_stack[^1]
                 ctrl = false
             elif chunk[0] == '\a' and not raw: ctrl = true   # Control character.
             elif raw or chunk[0] != '\n':
