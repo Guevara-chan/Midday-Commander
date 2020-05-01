@@ -343,13 +343,14 @@ when not defined(DirViewer):
         elif KEY_Enter.IsKeyPressed:  invoke self.hentry
         elif KEY_Insert.IsKeyPressed: switch_selection(hline); scroll 1
         elif KEY_KP_Enter.IsKeyPressed: select_inverted()
+        else:
         # Gamepad controls.
-        case GetGamepadButtonPressed():
-            of GAMEPAD_BUTTON_LEFT_FACE_UP:    (if norepeat(): scroll -1)
-            of GAMEPAD_BUTTON_LEFT_FACE_DOWN:  (if norepeat(): scroll +1)
-            of GAMEPAD_BUTTON_LEFT_FACE_LEFT:  scroll_to 0
-            of GAMEPAD_BUTTON_LEFT_FACE_RIGHT: scroll_to list.len
-            elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN): invoke self.hentry
+            case GetGamepadButtonPressed():
+                of GAMEPAD_BUTTON_LEFT_FACE_UP:    (if norepeat(): scroll -1)
+                of GAMEPAD_BUTTON_LEFT_FACE_DOWN:  (if norepeat(): scroll +1)
+                of GAMEPAD_BUTTON_LEFT_FACE_LEFT:  scroll_to 0
+                of GAMEPAD_BUTTON_LEFT_FACE_RIGHT: scroll_to list.len
+                elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN): invoke self.hentry
         # Finalization.
         return self
 
@@ -476,6 +477,7 @@ when not defined(CommandLine):
         # Deferred output handling.
         defer: 
             if not shell.isNil and shell.hasData: 
+
                 record shell.outputStream.readLine.convert(srcEncoding = cmd_cp)
                 if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
         if self.exclusive: # Scrolling controls.
@@ -1261,7 +1263,8 @@ when not defined(MultiViewer):
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
                 elif KEY_Left_Alt.IsKeyPressed or KEY_Right_Alt.IsKeyPressed: switch_quick_search()
                 # Gamepad controls
-                if 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_UP): request_deletion()
+                elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_TRIGGER_1): select(self.next_index)
+                elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_UP):   request_deletion()
                 # Quick search update.
                 if quick_search and cmdline.input_changed: self.active.scroll_to_prefix cmdline.input
                 # File viewer update.
