@@ -58,8 +58,8 @@ when not defined(Meta):
                 idx.inc
             return true
         let 
-            (dir, name, ext) = path.splitFile
-            mask = pattern.s_plitFile
+            (dir, name, ext) = (if FileSystemCaseSensitive: path else: path.toLower).splitFile
+            mask = (if FileSystemCaseSensitive: pattern else: pattern.toLower).splitFile
         return name.matchpart(mask.name) and ext.undot.match_part(mask.ext.undot)
 
     proc truePath(path: string, follow_symlink = true): string =
