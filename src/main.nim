@@ -335,7 +335,7 @@ when not defined(DirViewer):
         self.show_repr = KEY_Delete.IsKeyDown()
         if   KEY_Insert.IsKeyPressed and control_down(): self.hpath.SetClipboardText
         elif KEY_Up.IsKeyDown:        (if norepeat(): scroll -1)
-        elif KEY_Down.IsKeyDown:      (if norepeat(): scroll 1)
+        elif KEY_Down.IsKeyDown:      (if norepeat(): scroll +1)
         elif KEY_Page_Up.IsKeyDown:   (if norepeat(): scroll -self.capacity)
         elif KEY_Page_Down.IsKeyDown: (if norepeat(): scroll self.capacity)
         elif KEY_Left.IsKeyPressed:   scroll_to 0
@@ -343,6 +343,13 @@ when not defined(DirViewer):
         elif KEY_Enter.IsKeyPressed:  invoke self.hentry
         elif KEY_Insert.IsKeyPressed: switch_selection(hline); scroll 1
         elif KEY_KP_Enter.IsKeyPressed: select_inverted()
+        # Gamepad controls.
+        case GetGamepadButtonPressed():
+            of GAMEPAD_BUTTON_LEFT_FACE_UP:    (if norepeat(): scroll -1)
+            of GAMEPAD_BUTTON_LEFT_FACE_DOWN:  (if norepeat(): scroll +1)
+            of GAMEPAD_BUTTON_LEFT_FACE_LEFT:  scroll_to 0
+            of GAMEPAD_BUTTON_LEFT_FACE_RIGHT: scroll_to list.len
+            elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN): invoke self.hentry
         # Finalization.
         return self
 
@@ -371,8 +378,7 @@ when not defined(DirViewer):
                 write (if entry.selected: "╟" else : "║"), border_color, DARKBLUE
                 write [desc.id.fit_left(name_col), "\a\x01", if ($entry).runeLen>name_col:"…" else:"│"], text_color,
                     if active and idx == hline and not self.show_repr: hl_color else: DARKBLUE # Highlight line.
-                write [desc.metrics.fit(size_col), "\a\x01│"], text_color
-                write desc.time_stamp.fit_left(date_col), text_color
+                write [desc.metrics.fit(size_col), "\a\x01│\a\xff", desc.time_stamp.fit_left(date_col)], text_color
                 write ["\a\x01", (if entry.selected: "╢" else : "║"), "\n"], text_color, DARKBLUE
         # 1st footline rendering.
         host.write ["║", "─".repeat(name_col), "┴", "─".repeat(size_col), "┴", "─".repeat(date_col), "║\n║"], 
@@ -539,6 +545,10 @@ when not defined(Alert):
         # Keyboard controls
         elif KEY_Escape.IsKeyPressed: "n"
         elif KEY_Space.IsKeyPressed:  "y"
+        # Gamepad controls.
+        elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN):  "y"
+        elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT): "n"
+        # Additiona controls (y/n)
         else: $(GetKeyPressed().Rune)
         # Finalization.
         case input
@@ -1246,6 +1256,8 @@ when not defined(MultiViewer):
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
                 elif KEY_Left_Alt.IsKeyPressed or KEY_Right_Alt.IsKeyPressed: switch_quick_search()
+                # Gamepad controls
+                if 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_UP): request_deletion()
                 # Quick search update.
                 if quick_search and cmdline.input_changed: self.active.scroll_to_prefix cmdline.input
                 # File viewer update.
