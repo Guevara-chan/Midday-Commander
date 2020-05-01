@@ -14,6 +14,7 @@ Compilation can be achieved through automated build script provided as `release.
 * Full mouse support with drag/drop.
 * OpenGL-powered pseudographics in classical 16-colors palette.
 * Make, move, copy & rename files and directories like you did in late 80s.
+* Quicksearch, pattern-based selection and 4 sort modes for better folder navigation.
 
 # •Brief sampling of retrofuture management•
 ![Main](https://user-images.githubusercontent.com/8768470/79723245-16871400-82ee-11ea-8333-6add94eda3aa.png)
