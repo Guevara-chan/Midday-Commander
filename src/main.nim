@@ -479,12 +479,16 @@ when not defined(CommandLine):
                 record shell.outputStream.readLine.convert(srcEncoding = cmd_cp)
                 if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
         if self.exclusive: # Scrolling controls.
-            scroll -GetMouseWheelMove()
-            if KEY_PageUp.IsKeyDown:      (if norepeat(): scroll -host.vlines)
-            elif KEY_PageDown.IsKeyDown:  (if norepeat(): scroll +host.vlines)
-            elif KEY_Up.IsKeyDown:        (if norepeat(): scroll -1)
-            elif KEY_Down.IsKeyDown:      (if norepeat(): scroll 1)
-            elif KEY_Pause.IsKeyPressed:  (if self.running: shell.kill)
+            scroll -GetMouseWheelMove()     # Mouse controls
+            case GetGamepadButtonPressed(): # Gamepad & keyboard controls.
+                of GAMEPAD_BUTTON_LEFT_FACE_UP:   (if norepeat(): scroll -1)
+                of GAMEPAD_BUTTON_LEFT_FACE_DOWN: (if norepeat(): scroll +1)
+                of GAMEPAD_BUTTON_MIDDLE_LEFT:    (if self.running: shell.kill)
+                elif KEY_PageUp.IsKeyDown:        (if norepeat(): scroll -host.vlines)
+                elif KEY_PageDown.IsKeyDown:      (if norepeat(): scroll +host.vlines)
+                elif KEY_Up.IsKeyDown:            (if norepeat(): scroll -1)
+                elif KEY_Down.IsKeyDown:          (if norepeat(): scroll +1)
+                elif KEY_Pause.IsKeyPressed:      (if self.running: shell.kill)
         else: # Input controls.
             if input != "": # Backspace only if there are text to remove.
                 if KEY_Backspace.IsKeyDown: # Delete last char.
