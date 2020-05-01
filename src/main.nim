@@ -1,6 +1,6 @@
 import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import std/with, winlean, rayterm, raylib
+import std/with, winlean, auxiliary/colors, rayterm, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -521,8 +521,10 @@ when not defined(CommandLine):
             if input != "": # Backspace only if there are text to remove.
                 if KEY_Backspace.IsKeyDown: # Delete last char.
                     if norepeat(): input = input.runeSubstr(0, input.runeLen-1); input_changed = true
-            if KEY_Enter.IsKeyPressed and not through_req: # Input actualization.
-                if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
+            if KEY_Enter.IsKeyPressed: # Input actualization.
+                if not through_req:
+                    if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
+                else: input = ""
             elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort() # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed: paste $GetClipboardText(); abort()
             let key = GetKeyPressed()
@@ -638,8 +640,7 @@ when not defined(ProgressWatch):
         # Status render.
         if status != "": host.with:
                 loc(0, 0)
-                write ["\a\x06", operation, "\a\xff│"], Black, DarkGray
-                write status.fit_left(host.hlines), Beige
+                write [operation, "\a\x0C│\a\x0A", status.fit_left(host.hlines)], Orange, DarkGray
                 loc(host.hlines - ticks.`$`.len - 1, 0)
                 write ["│\a\x06", $ticks], Black
         # Timeline render.
@@ -699,8 +700,9 @@ when not defined(FileViewer):
     template caption(self: FileViewer): string   = (if fullscreen: self.src else: self.src.extractFilename)
     template active(self: FileViewer): bool      = self.fullscreen
     template bg(self: FileViewer): Color         = (if self.night: BLACK     else: DARKBLUE.Fade 0.7)
-    template fg(self: FileViewer): Color         = (if self.night: LIGHTGRAY else: RayWhite)
-    template border_clr(self: FileViewer): Color = (if self.night: DARKBLUE else: GRAY)
+    template fg(self: FileViewer): Color         = (if self.night: LightGray else: RayWhite)
+    template brd_color(self: FileViewer): Color  = (if self.night: Beige.Fade 0.7  else: GRAY)
+    template ctrl_color(self: FileViewer): Color = DARKGRAY
     template fixed_view(self: FileViewer): bool  = self.data_piped or not self.feed_avail
 
     proc caption_limited(self: FileViewer): string =        
@@ -895,9 +897,9 @@ when not defined(FileViewer):
 
     proc post_render(self: FileViewer) =
             host.loc(0, host.vpos)
-            if x>0: host.write "\x11", GOLD, DARKGRAY else: host.write "│", self.border_clr, self.bg 
+            if x>0: host.write "\x11", GOLD, DARKGRAY else: host.write "│", self.brd_color, self.bg 
             host.loc(host.hlines-1, host.vpos)
-            if x<self.right_edge: host.write "\x10", GOLD, DARKGRAY: else: host.write "│", self.border_clr, self.bg 
+            if x<self.right_edge: host.write "\x10", GOLD, DARKGRAY: else: host.write "│", self.brd_color, self.bg 
 
     method update(self: FileViewer): Area {.discardable.} =
         f_key = 0 # F-key emulator.
@@ -962,19 +964,19 @@ when not defined(FileViewer):
         let peller = if walker.isNil: " " else: $("\\|/-"[ticker])
         proc write_centered(text: string, color: Color) =
             host.loc (self.hcap - text.runeLen) div 2 + self.margin, host.vpos()
-            host.write @[" ", text, " "], color, DARKGRAY
+            host.write @[" ", text, " "], color, self.ctrl_color
         # Header render.
         with host:
             loc(self.margin, 0)
-            write if fullscreen: "╘" else: "╒", self.border_clr, self.bg
-            write [" ", lense_id, "\a\x09", peller], if self.feed_avail: SKYBLUE else: RED, DARKGRAY
-            write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), self.border_clr, self.bg
-            write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, DARKGRAY
-            write [if fullscreen: "╛" else: "╕", ""], self.border_clr, self.bg
+            write if fullscreen: "╘" else: "╒", self.brd_color, self.bg
+            write [" ", lense_id, "\a\x09", peller], if self.feed_avail: SKYBLUE else: RED, self.ctrl_color
+            write "═".repeat(self.hcap-lense_id.runeLen-5-fullscreen.int*border_shift), self.brd_color, self.bg
+            write (if fullscreen: "\x10│\x11" else: "╡↔╞"), GOLD, self.ctrl_color
+            write [if fullscreen: "╛" else: "╕", ""], self.brd_color, self.bg
         if self.feed_avail and (y>0 or x>0 or fullscreen): # Locations hint.
             write_centered [if linecount-self.vcap>0: $y else: "*", ":", if self.right_edge > self.hcap: $x else: "*", 
                 if self.data_piped or feedsize-self.hexcells<=0: "" else: &"/off={pos:X}"].join(""), PURPLE
-        host.write "\n", self.border_clr, self.bg
+        host.write "\n", self.brd_color, self.bg
         # Rendering loop.
         let 
             lborder = if xoffset > 0: "┤" else: "│"
@@ -987,11 +989,11 @@ when not defined(FileViewer):
                 write if fullscreen: "" else: lborder
                 write prefix, Purple # Line numbers, etc.
                 write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), self.fg, raw=self.hide_colors
-                write if fullscreen: "\n" else: rborder, self.border_clr
+                write if fullscreen: "\n" else: rborder, self.brd_color
         # Footing render.
         with(host):
             write if fullscreen: "╒" else: "╘"
-            write "═".repeat(self.hcap - fullscreen.int * 2), self.border_clr, self.bg
+            write "═".repeat(self.hcap - fullscreen.int * 2), self.brd_color, self.bg
             write if fullscreen: "╕" else: "╛"
         write_centered self.caption_limited, (if self.feed_avail: Orange else: Maroon)
         if self.fullscreen: host.write "\n"
@@ -1356,7 +1358,6 @@ when not defined(MultiViewer):
 # ==Main code==
 when isMainModule:    
     let 
-        win = newTerminalEmu("Midday Commander", "res/midday.png", 110, 33,
-            RAYWHITE, border_color, tips_color, DARKGRAY, LIME, LIGHTGRAY, ORANGE, selected_color, MAROON, PURPLE)
+        win = newTerminalEmu("Midday Commander", "res/midday.png", 110, 33, colors.default_palette)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win))
     win.loop_with supervisor
