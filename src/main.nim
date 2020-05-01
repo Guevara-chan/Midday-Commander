@@ -99,7 +99,7 @@ when not defined(Meta):
         for (kind, path) in walkDir(src):
             let dest = dest / path.extractFilename
             if path.fileExists:
-                tick(path); if destructive: path.moveFile dest else: path.copyFile dest
+                tick(path); dest.removeFile; if destructive: path.moveFile dest else: path.copyFile dest
             else: path.transfer_dir(dest, destructive, tick)
         tick(src); if destructive: src.removeDir
 # -------------------- #
@@ -1035,8 +1035,8 @@ when not defined(MultiViewer):
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn(&"Are you sure want to overwrite \n{dest.extractFilename}\n") > 0:
                 let start = getTime()
-                if src.dirExists: src.transfer_dir(dest, destructive, tick)#; sync()
-                else: tick(src); src.file_proc(dest)
+                if src.dirExists: src.transfer_dir(dest, destructive, tick)
+                else: tick(src); dest.removeFile; src.file_proc(dest)
                 return true
 
     template sel_transfer(self: MultiViewer, file_proc: untyped, destructive = false, ren_pattern = "") =
