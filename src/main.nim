@@ -615,7 +615,7 @@ when not defined(ProgressWatch):
 
     # --Methods goes here:
     proc cancel(self: ProgressWatch) =
-        cancelled = true; abort("Progress tracking was cancelled by user.")
+        cancelled = true; abort("Task was cancelled by user.")
 
     proc tick(self: ProgressWatch, status: string) =
         ticks.inc
@@ -638,10 +638,8 @@ when not defined(ProgressWatch):
         # Status render.
         if status != "": host.with:
                 loc(0, 0)
-                write " ".repeat(host.hlines), Black, DarkGray
-                loc(0, 0)
-                write ["\a\x06", operation, "\a\xff│"], Black
-                write status, Beige
+                write ["\a\x06", operation, "\a\xff│"], Black, DarkGray
+                write status.fit_left(host.hlines), Beige
                 loc(host.hlines - ticks.`$`.len - 1, 0)
                 write ["│\a\x06", $ticks], Black
         # Timeline render.
