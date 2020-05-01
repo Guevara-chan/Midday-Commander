@@ -604,8 +604,9 @@ when not defined(Alert):
 when not defined(ProgressWatch):
     type ProgressWatch = ref object of Area
         host:   TerminalEmu
-        status: string
+        ticks: int
         start, frame_start: Time
+        operation, status: string
         cancelled, frameskip: bool
     const cancel_hint = " ESC to cancel │"
 
@@ -617,6 +618,7 @@ when not defined(ProgressWatch):
         cancelled = true; abort("Progress tracking was cancelled by user.")
 
     proc tick(self: ProgressWatch, status: string) =
+        ticks.inc
         if (getTime() - frame_start).inMilliseconds >= 50:
             self.status = status
             host.update self; frame_start = getTime()
@@ -634,11 +636,14 @@ when not defined(ProgressWatch):
         if frameskip: frameskip = false; return self
         if self.elapsed.inMilliseconds < 100: return self
         # Status render.
-        if status != "":
-            host.loc(0, 0)
-            host.write " ".repeat(host.hlines), Beige, DarkGray
-            host.loc((host.hlines - status.runeLen) div 2, 0)
-            host.write status, Beige, DarkGray
+        if status != "": host.with:
+                loc(0, 0)
+                write " ".repeat(host.hlines), Black, DarkGray
+                loc(0, 0)
+                write ["\a\x06", operation, "\a\xff│"], Black
+                write status, Beige
+                loc(host.hlines - ticks.`$`.len - 1, 0)
+                write ["│\a\x06", $ticks], Black
         # Timeline render.
         let midline = host.vlines div 2 - 1
         for y in (status!="").int..host.vlines-2: 
@@ -660,8 +665,8 @@ when not defined(ProgressWatch):
         host.write cancel_hint.repeat(host.hlines div cancel_hint.runeLen + 2), BLACK, SkyBlue
         return self
 
-    proc newProgressWatch(term: TerminalEmu, creator: Area): ProgressWatch =
-        ProgressWatch(host: term, parent: creator, start: getTime(), frameskip: true)
+    proc newProgressWatch(term: TerminalEmu, creator: Area, op = ""): ProgressWatch =
+        ProgressWatch(host: term, parent: creator, operation: op,start: getTime(), frameskip: true)
 # -------------------- #
 when not defined(FileViewer):
     type DataLine   = tuple[origin: int, data: string]
@@ -1054,8 +1059,8 @@ when not defined(MultiViewer):
         error = (msg: err.msg, time: getTime())
         if not (err of ReraiseError): errorlog.add(error)
 
-    proc reset_watcher(self: MultiViewer) =
-        watcher = newProgressWatch(host, self)
+    proc reset_watcher(self: MultiViewer, op = "") =
+        watcher = newProgressWatch(host, self, op)
 
     proc warn(self: MultiViewer, message: string): int =
         if not watcher.isNil: watcher.frameskip = true
@@ -1078,7 +1083,7 @@ when not defined(MultiViewer):
         var 
             last_transferred: string
             sel_indexes = self.active.selected_indexes # For selection removal.
-        reset_watcher()
+        reset_watcher(if destructive: "Move" else: "Copy")
         uninspect()
         # Deffered finalization.
         defer:
@@ -1138,7 +1143,7 @@ when not defined(MultiViewer):
     proc delete(self: MultiViewer) =
         # Init setup.
         proc tick(now_processing: string) = watcher.tick now_processing # aux binding
-        reset_watcher()
+        reset_watcher("Delete")
         # Deffered finalization.
         defer:
             if self.active.dirty:
