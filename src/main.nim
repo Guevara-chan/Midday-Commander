@@ -635,8 +635,10 @@ when not defined(ProgressWatch):
         if self.elapsed.inMilliseconds < 100: return self
         # Status render.
         if status != "":
+            host.loc(0, 0)
+            host.write " ".repeat(host.hlines), Beige, DarkGray
             host.loc((host.hlines - status.runeLen) div 2, 0)
-            host.write status, Purple, DarkGray
+            host.write status, Beige, DarkGray
         # Timeline render.
         let midline = host.vlines div 2 - 1
         for y in (status!="").int..host.vlines-2: 
