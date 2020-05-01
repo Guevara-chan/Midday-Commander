@@ -697,7 +697,7 @@ when not defined(FileViewer):
     template active(self: FileViewer): bool      = self.fullscreen
     template bg(self: FileViewer): Color         = (if self.night: BLACK     else: DARKBLUE.Fade 0.7)
     template fg(self: FileViewer): Color         = (if self.night: LIGHTGRAY else: RayWhite)
-    template border_clr(self: FileViewer): Color = (if self.night: BEIGE else: GRAY)
+    template border_clr(self: FileViewer): Color = (if self.night: DARKBLUE else: GRAY)
     template fixed_view(self: FileViewer): bool  = self.data_piped or not self.feed_avail
 
     proc caption_limited(self: FileViewer): string =        
