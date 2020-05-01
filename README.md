@@ -12,6 +12,7 @@ Compilation can be achieved through automated build script provided as `release.
 * Split-screen quickview.
 * Vintage control buttons scheme.
 * Full mouse support with drag/drop.
+* Original UI design, not based on common OS controls layouts.
 * OpenGL-powered pseudographics in classical 16-colors palette.
 * Make, move, copy & rename files and directories like you did in late 80s.
 * Quicksearch, pattern-based selection and 4 sort modes for better folder navigation.
