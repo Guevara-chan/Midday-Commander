@@ -1,6 +1,6 @@
 import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
 from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
-import std/with, winlean, auxiliary/colors, rayterm, raylib
+import std/with, winlean, auxiliary/colors, auxiliary/help, rayterm, raylib
 {.this: self.}
 
 #.{ [Classes]
@@ -102,45 +102,6 @@ when not defined(Meta):
                 tick(path); if destructive: path.moveFile dest else: path.copyFile dest
             else: path.transfer_dir(dest, destructive, tick)
         tick(src); if destructive: src.removeDir
-
-    # --Data:
-    const help = @[
-        "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.07",
-        "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
-        "\a\x01===================================================================================",
-        "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel tracking",
-        "\a\x02F1:\a\x01     display this cheatsheet (\a\x02ESC\a\xff to return)",
-        "\a\x02F3:\a\x01     switch preview mode on/off",
-        "\a\x02F5:\a\x01     copy selected entri(s)",
-        "\a\x02F6:\a\x01     request moving selected entri(s) with optional renaming",
-        "\a\x02F7:\a\x01     request directory creation",
-        "\a\x02F8:\a\x01     delete selected entri(s)",
-        "\a\x02F10:\a\x01    quit program",
-        "\a\x02F11:\a\x01    switch debug info on/off",
-        "\a\x02Alt:\a\x01    switch quicksearch mode on/off",
-        "\a\x02Space:\a\x01  confirm alert choice",
-        "\a\x02Insert:\a\x01 (un)select hilited entry",
-        "\a\x02Home:\a\x01   request new path to browse",
-        "\a\x02Left:\a\x01   move to begin of listing",
-        "\a\x02Right:\a\x01  move to end of listing",
-        "\a\x02Up:\a\x01     move selection/view 1 line up",
-        "\a\x02Down:\a\x01   move selection/view 1 line down ",
-        "\a\x02PgUp:\a\x01   move selection/view 1 page up",
-        "\a\x02PgDown:\a\x01 move selection/view 1 page down",
-        "\a\x02Pause:\a\x01  cancel query OR cancel command execution",
-        "\a\x02Delete:\a\x01 hilight currently viewed dir (while pressed)",
-        "\a\x02End:\a\x01    paste fullpath to hilited entry into commandline",
-        "\a\x02Enter:\a\x01  inspect hilited dir OR run hilited file OR execute command ",
-        "\a\x07Ctrl+\a\x02F4-F7:\a\x01   sort entry list by name/extension/size/modification time ",
-        "\a\x07Ctrl+\a\x02Insert:\a\x01  store path to hilited entry into clipboard",
-        "\a\x07Shift+\a\x02F2:\a\x01     display detailed error history",
-        "\a\x07Shift+\a\x02F3:\a\x01     view hilited entry in full",
-        "\a\x07Shift+\a\x02F7:\a\x01     request symlink creation for hilited entry",
-        "\a\x07Shift+\a\x02Insert:\a\x01 paste clipboard to commandline",
-        "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
-        "\a\x07Numpad|\a\x02+:\a\x01     request pattern for mass selection in current dir",
-        "\a\x07Numpad|\a\x02-:\a\x01     request pattern for mass deselection in current dir",
-        "==================================================================================="]
 # -------------------- #
 when not defined(DirEntry):
     type DirEntryDesc = tuple[id: string, metrics: string, time_stamp: string, coloring: Color]
@@ -640,7 +601,7 @@ when not defined(ProgressWatch):
         # Status render.
         if status != "": host.with:
                 loc(0, 0)
-                write [operation, "\a\x0C│\a\x0A", status.fit_left(host.hlines)], Orange, DarkGray
+                write [operation, "\a\x0D│\a\x0A", status.fit_left(host.hlines)], Orange, DarkGray
                 loc(host.hlines - ticks.`$`.len - 1, 0)
                 write ["│\a\x06", $ticks], Black
         # Timeline render.
@@ -1175,7 +1136,7 @@ when not defined(MultiViewer):
                 self.active.dirty = true
 
     proc show_help(self: MultiViewer) =
-        inspect(help.join("\n"), "@HELP").switch_fullscreen(1).switch_lighting(0)
+        inspect(help.core_help.join("\n"), "@HELP").switch_fullscreen(1).switch_lighting(0)
 
     proc show_errorlog(self: MultiViewer) =
         inspect(&"\a\x06{errorlog.len.by3}\a\xff erorrs occured since startup (\a\x02ESC\a\xff to return).\n\n" &
