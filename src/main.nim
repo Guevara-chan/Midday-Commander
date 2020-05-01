@@ -644,7 +644,7 @@ when not defined(ProgressWatch):
                 write ["│\a\x06", $ticks], Black
         # Timeline render.
         let midline = host.vlines div 2 - 1
-        for y in (status!="").int..host.vlines-2: 
+        for y in (status!="").int..host.vlines-2:
             let 
                 shift  = self.elapsed.inSeconds + 1 * (y - midline)
                 time   = initDuration(seconds = 0.int64.max(shift))
@@ -1197,11 +1197,13 @@ when not defined(MultiViewer):
             if entry.name.wildcard_match(mask): self.active.switch_selection(idx, new_state.int)
 
     proc request_navigation(self: MultiViewer) =
-        cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path:string) => self.navigate path
+        cmdline.request &"Input path to browse \a\x03<{drive_list().join(\"|\")}>", (path:string) =>
+            self.navigate path.strip(false, true)
 
     proc request_moving(self: MultiViewer) =
         if self.active.selection_valid:
-            cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) => self.move pattern
+            cmdline.request "Input renaming pattern \a\x03<*.*>", (pattern: string) =>
+                self.move pattern.strip.strip(false, true)
 
     proc request_new_dir(self: MultiViewer) =
         cmdline.request "Input name for new directory", (name: string) => self.new_dir name
