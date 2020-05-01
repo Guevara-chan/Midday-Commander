@@ -96,11 +96,13 @@ when not defined(Meta):
 
     proc transfer_dir(src, dest: string; destructive: bool, tick: proc(now_processing: string)) =
         dest.createDir
+        var tframe = getTime()
         for (kind, path) in walkDir(src):
             let dest = dest / path.extractFilename
-            tick(path); if path.fileExists:                
+            if path.fileExists:
+                if (getTime() - tframe).inMilliseconds > 100: tick(src); tframe = getTime()
                 if destructive: path.moveFile dest else: path.copyFile dest
-            else: path.transfer_dir dest, destructive, tick
+            else: path.transfer_dir(dest, destructive, tick)
         tick(src); if destructive: src.removeDir
 
     # --Data:
@@ -1066,6 +1068,7 @@ when not defined(MultiViewer):
         proc tick(now_processing: string) = watcher.tick now_processing # aux binding.        
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn(&"Are you sure want to overwrite \n{dest.extractFilename}\n") > 0:
+                let start = getTime()
                 if src.dirExists: src.transfer_dir(dest, destructive, tick)#; sync()
                 else: tick(src); src.file_proc(dest)
                 return true
@@ -1088,7 +1091,6 @@ when not defined(MultiViewer):
                 let src = self.active.path / entry.name
                 let dest = self.next_path / src.extractFilename.wildcard_replace(
                     if ren_pattern != "": ren_pattern else: "*.*")
-                echo dest
                 if (not self.next_path.startsWith src) and transfer(src, dest, file_proc, destructive):
                     self.next_viewer.dirty = true # Setting 'dirty' flags.
                     if destructive: self.active.dirty = true
