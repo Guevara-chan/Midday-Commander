@@ -759,8 +759,8 @@ when not defined(FileViewer):
         ext_table.sort()
         let ext_sum = collect(newSeq): 
             for key,val in ext_table.pairs: 
-                (&"\a\x05{key}\a\x00: \a\x06{val}\a\x00").replace(".", ".\a\x00").align_left(22,' '.Rune) & 
-                    &" (\a\x09{(val/files.int*100):.2f}%\a\x00)"               
+                (&"\a\x05{key}\a\xff: \a\x06{val}\a\x0f").replace(".", ".\a\x0f").align_left(22,' '.Rune) & 
+                    &" (\a\x09{(val/files.int*100):.2f}%\a\xff)"               
         # Finalization.
         let
             path_hdr = &"Sum:: \a\x06{(path.normalizePathEnd(true).truePath(false)).convert(cmd_cp, \"UTF-8\")}\a\x05"
@@ -1227,8 +1227,11 @@ when not defined(MultiViewer):
     method update(self: MultiViewer): Area {.discardable.} =
         f_key = 0 # F-key emulator.
         try:
+            let droplist = check_droplist()
             if not self.fullview: cmdline.update()
-            if self.fullview: (if inspector.update().isNil: uninspect())
+            if self.fullview: # Some aux handling for file viewer.                
+                if inspector.update().isNil: uninspect()
+                elif droplist.len > 0: inspector.open droplist[0]
             elif not cmdline.exclusive:
                 # Mouse controls.
                 let
@@ -1238,8 +1241,7 @@ when not defined(MultiViewer):
                 if MOUSE_Left_Button.IsMouseButtonDown or MOUSE_Right_Button.IsMouseButtonDown: # DirViewers picking.
                     if fv_pick == FVControls.none and picked_view_idx >= 0: select picked_view_idx
                 elif MOUSE_Left_Button.IsMouseButtonReleased: f_key = pick_fkey(x, y) # Command buttons picking.
-                # Drag/drop handling.
-                let droplist = check_droplist()                
+                # Drag/drop handling for contained areas.                              
                 if droplist.len > 0:
                     if self.fullview: inspector.open droplist[0]
                     elif picked_view_idx >= 0:

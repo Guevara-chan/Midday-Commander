@@ -1,7 +1,7 @@
 import ../raylib
 
 const default_palette* = [
-  RAYWHITE,  # \a\x00
+  BLACK,     # \a\x00
   GRAY,      # \a\x01
   GOLD,      # \a\x02
   DARKGRAY,  # \a\x03
@@ -14,5 +14,8 @@ const default_palette* = [
   BEIGE,     # \a\x0A
   DARKBLUE,  # \a\x0B
   SKYBLUE,   # \a\x0C
-  BLACK,     # \a\x0D
+  RED,       # \a\x0D
+  GREEN,     # \a\x0E
+  RAYWHITE,  # \a\x0F
+  # Finally:   \a\xFF to return previous color.
 ]
