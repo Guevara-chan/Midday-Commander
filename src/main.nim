@@ -477,9 +477,8 @@ when not defined(CommandLine):
         if KEY_Escape.IsKeyPressed: fullscreen = not fullscreen
         # Deferred output handling.
         defer: 
-            if not shell.isNil and shell.hasData: 
-
-                record shell.outputStream.readLine.convert(srcEncoding = cmd_cp)
+            if not shell.isNil and shell.hasData:
+                for line in shell.outputStream.lines(): record line.convert(srcEncoding = cmd_cp)
                 if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
         if self.exclusive: # Scrolling controls.
             scroll -GetMouseWheelMove()     # Mouse controls

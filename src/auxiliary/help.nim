@@ -12,7 +12,7 @@ const core_help* = [
     "\a\x02F10:\a\x01    quit program",
     "\a\x02F11:\a\x01    switch debug info on/off",
     "\a\x02Tab:\a\x01    select next directory viewer",
-    "\a\x02Alt:\a\x01    switch quicksearch mode on/off",
+    "\a\x02RAlt:\a\x01   switch quicksearch mode on/off",
     "\a\x02Space:\a\x01  confirm alert choice",
     "\a\x02Insert:\a\x01 (un)select hilited entry",
     "\a\x02Home:\a\x01   request new path to browse",
