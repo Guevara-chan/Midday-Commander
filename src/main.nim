@@ -209,7 +209,6 @@ when not defined(DirViewer):
         origin = if hline >= origin + self.capacity: hline - self.capacity + 1
         else: min(origin, hline)
         hl_changed = true
-        echo hl_changed
         return self
 
     proc scroll(self: DirViewer, shift = 0) =
@@ -1287,7 +1286,7 @@ when not defined(MultiViewer):
                 if self.inspecting:
                     if self.previewing:
                         inspector.xoffset = self.next_viewer.xoffset
-                        if inspector.data_piped or self.active.hl_changed: inspect()
+                        if inspector.data_piped or self.active.hl_changed: inspect() # Reopen if volatile.
                     inspector.update()                    
                 self.active.lapse = (getTime() - start).inMilliseconds
                 # Viewer update.
