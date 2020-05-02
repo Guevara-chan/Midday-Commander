@@ -209,6 +209,7 @@ when not defined(DirViewer):
         origin = if hline >= origin + self.capacity: hline - self.capacity + 1
         else: min(origin, hline)
         hl_changed = true
+        echo hl_changed
         return self
 
     proc scroll(self: DirViewer, shift = 0) =
@@ -314,14 +315,15 @@ when not defined(DirViewer):
     method update(self: DirViewer): Area {.discardable.} =
         # Init setup.
         hl_changed   = false
-        # Mouse controls.
         if not active: return self
-        scroll -GetMouseWheelMove()
+        # Mouse controls.
         let
             (x, y)    = host.pick()
             pickline  = y - hdr_height
             pickindex = pickline + origin
             newsorter = pick_sorter(x, y)
+            wheel_shift = -GetMouseWheelMove()
+        if wheel_shift != 0: scroll wheel_shift
         if newsorter == SortCriteria.default and (y < hdr_height or y >= host.vlines - service_height - foot_height):
             discard # Not service zone.
         elif MOUSE_Left_Button.IsMouseButtonReleased:  # Invoke item by double left click.
@@ -666,8 +668,8 @@ when not defined(FileViewer):
         cell = "FF ".len
 
     # --Properties:
-    template feed_avail(self: FileViewer): bool  = not feed.isNil
-    template data_piped(self: FileViewer): bool  = feed of StringStream
+    template feed_avail(self: FileViewer): bool  = not self.feed.isNil
+    template data_piped(self: FileViewer): bool  = self.feed of StringStream
     template width(self: FileViewer): int        = self.host.hlines div (2 - self.fullscreen.int)
     template hcap(self: FileViewer): int         = self.width - border_shift * (not self.fullscreen).int
     template vcap(self: FileViewer): int         = self.host.vlines - border_shift * 2 + self.fullscreen.int
@@ -921,19 +923,28 @@ when not defined(FileViewer):
                 of FVControls.lense:    cycle_lenses()      # Switch view mode on inspector tag click.
                 of FVControls.minmax:   switch_fullscreen() # Switch between preview & full modes.
                 elif self.active: f_key = fkey_feed(x, y)   # Command buttons picking.
-        # Keyboard controls.
         if self.active:
+            # Keyboard controls.
             if   KEY_PageUp.IsKeyDown:    (if norepeat(): vscroll -self.vcap)
             elif KEY_PageDown.IsKeyDown:  (if norepeat(): vscroll +self.vcap)
             elif KEY_Up.IsKeyDown:        (if norepeat(): vscroll -1)
-            elif KEY_Down.IsKeyDown:      (if norepeat(): vscroll 1)
+            elif KEY_Down.IsKeyDown:      (if norepeat(): vscroll +1)
             elif KEY_Left.IsKeyDown:      (if norepeat(): hscroll -1)
-            elif KEY_Right.IsKeyDown:     (if norepeat(): hscroll 1)
+            elif KEY_Right.IsKeyDown:     (if norepeat(): hscroll +1)
             elif KEY_F3.IsKeyPressed and not shift_down() or f_key == 3: switch_fullscreen 0
             elif KEY_F4.IsKeyPressed  or f_key == 4:                     cycle_lenses()
             elif KEY_F5.IsKeyPressed  or f_key == 5:                     (if not self.fixed_view(): switch_lighting())
             elif KEY_F6.IsKeyPressed  or f_key == 6:                     line_numbers = not line_numbers
             elif KEY_F10.IsKeyPressed or f_key == 10 or KEY_Escape.IsKeyPressed: return nil
+            else:
+            # Gamepad controls.
+                case GetGamepadButtonPressed():
+                    of GAMEPAD_BUTTON_LEFT_FACE_UP:    (if norepeat(): vscroll -1)
+                    of GAMEPAD_BUTTON_LEFT_FACE_DOWN:  (if norepeat(): vscroll +1)
+                    of GAMEPAD_BUTTON_LEFT_FACE_LEFT:  (if norepeat(): hscroll -1)
+                    of GAMEPAD_BUTTON_LEFT_FACE_RIGHT: (if norepeat(): hscroll +1)
+                    of GAMEPAD_BUTTON_MIDDLE_LEFT:     return nil
+                    elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_LEFT): line_numbers = not line_numbers
         return self
 
     method render(self: FileViewer): Area {.discardable.} =
@@ -1231,9 +1242,13 @@ when not defined(MultiViewer):
                 # Drag/drop handling.
                 let droplist = check_droplist()                
                 if droplist.len > 0:
-                    if picked_view_idx >= 0:
-                        select picked_view_idx
-                        receive droplist
+                    if self.fullview: inspector.open droplist[0]
+                    elif picked_view_idx >= 0:
+                        if self.previewing and inspector.xoffset == viewers[picked_view_idx].xoffset:
+                            inspector.open droplist[0]
+                        else:
+                            select picked_view_idx
+                            receive droplist
                     elif y == host.vlines - service_height: cmdline.paste(droplist[0])
                 # Hint controls (ctrl+).
                 if control_down():
@@ -1272,7 +1287,7 @@ when not defined(MultiViewer):
                 if self.inspecting:
                     if self.previewing:
                         inspector.xoffset = self.next_viewer.xoffset
-                        if self.active.hl_changed: inspect()
+                        if inspector.data_piped or self.active.hl_changed: inspect()
                     inspector.update()                    
                 self.active.lapse = (getTime() - start).inMilliseconds
                 # Viewer update.
