@@ -439,13 +439,13 @@ when not defined(CommandLine):
     proc record(self: CommandLine, line: string) =
         log.add(line); scroll log.len
 
-    proc record(self: CommandLine, lines: seq[string]) =
+    proc record(self: CommandLine, lines: openArray[string]) =
         for line in lines: log.add(line)
         scroll log.len
 
     proc shell(self: CommandLine, cmd: string = "") =
         let command = (if cmd != "": cmd else: input)
-        record(&"\a\x03>>\a\x04{command}")
+        record [&"\a\x03>>\a\x04{command}", ""]
         shell = when defined(windows): 
               startProcess "cmd.exe",   dir_feed().path, ["/c", command], nil, {poStdErrToStdOut, poDaemon}
         else: startProcess "/bin/bash", dir_feed().path, [command, "|| exit"]
@@ -470,6 +470,7 @@ when not defined(CommandLine):
     method update(self: CommandLine): Area {.discardable.} =
         # Init setup.
         input_changed = false
+        let key = GetKeyPressed()
         # Service controls.
         let (x, y) = host.pick()
         if y == 0 and x >= host.hlines - exit_hint.len and MOUSE_Left_Button.IsMouseButtonReleased and fullscreen:
@@ -477,8 +478,11 @@ when not defined(CommandLine):
         if KEY_Escape.IsKeyPressed: fullscreen = not fullscreen
         # Deferred output handling.
         defer: 
-            if not shell.isNil and shell.hasData:
-                for line in shell.outputStream.lines(): record line.convert(srcEncoding = cmd_cp)
+            if not shell.isNil:
+                while shell.hasData:
+                    let chr = shell.outputStream.readChar
+                    if chr in ['\n']: log.add("") #record line_buffer.convert(srcEncoding = cmd_cp); line_buffer = ""
+                    elif chr != '\c': log[^1] &= chr.`$`.convert(srcEncoding = cmd_cp) #line_buffer &= $chr
                 if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
         if self.exclusive: # Scrolling controls.
             scroll -GetMouseWheelMove()     # Mouse controls
@@ -491,6 +495,7 @@ when not defined(CommandLine):
                 elif KEY_Up.IsKeyDown:            (if norepeat(): scroll -1)
                 elif KEY_Down.IsKeyDown:          (if norepeat(): scroll +1)
                 elif KEY_Pause.IsKeyPressed:      (if self.running: shell.kill)
+            if key > 0: shell.inputStream.write($(key.Rune))
         else: # Input controls.
             if input != "": # Backspace only if there are text to remove.
                 if KEY_Backspace.IsKeyDown: # Delete last char.
@@ -501,7 +506,6 @@ when not defined(CommandLine):
                 else: input = ""
             elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort() # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed: paste $GetClipboardText(); abort()
-            let key = GetKeyPressed()
             if key > 0: paste($(key.Rune))
         # Finalization.
         return self
@@ -1276,7 +1280,7 @@ when not defined(MultiViewer):
                 elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
                 elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
-                elif KEY_Left_Alt.IsKeyPressed or KEY_Right_Alt.IsKeyPressed: switch_quick_search()
+                elif KEY_Right_Alt.IsKeyPressed:        switch_quick_search()
                 # Gamepad controls
                 elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_TRIGGER_1): select(self.next_index)
                 elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_UP):   request_deletion()
