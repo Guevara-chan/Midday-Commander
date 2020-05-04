@@ -37,7 +37,7 @@ const core_help* = [
     "\a\x07Numpad|\a\x02Enter:\a\x01 invert all selections in current dir",
     "\a\x07Numpad|\a\x02+:\a\x01     request pattern for mass selection in current dir",
     "\a\x07Numpad|\a\x02-:\a\x01     request pattern for mass deselection in current dir",
-    "\a\x07Numpad|\a\x02\:\a\x01     inspect parent dir",
+    "\a\x07Numpad|\a\x02/:\a\x01     inspect parent dir",
     "\a\x01===================================================================================",
     "                                \a\x03.[\a\xffGamepad controls\a\x03].",
     "\a\x01===================================================================================",

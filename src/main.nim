@@ -486,10 +486,12 @@ when not defined(CommandLine):
         # Deferred output handling.
         defer: 
             if not shell.isNil:
+                let start = getTime()
                 while shell.hasData:
                     let chr = shell.outputStream.readChar
                     if chr in ['\n']: log.add("")
                     elif chr != '\c': log[^1] &= chr.`$`.convert(srcEncoding = cmd_cp)
+                    if (getTime()-start).inMilliseconds > 100: break
                 if log.len > max_log: log = log[log.len-max_log..^1] # Memory saving.
                 if not shell.running: 
                     if log[^1] == "": discard log.pop
