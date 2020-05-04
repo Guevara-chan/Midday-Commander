@@ -19,6 +19,7 @@ when not defined(Meta):
     template undot(ext: string): string                            = ext.dup(removePrefix('.'))
     template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
     template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0,size
+    template limit[T](list: seq[T], lim: int): seq[T] = (if list.len > lim: list[list.len-lim..^1] else: list)
 
     proc check_droplist(): seq[string] =
         if IsFileDropped():
@@ -343,8 +344,8 @@ when not defined(DirViewer):
         elif KEY_Right.IsKeyPressed:  scroll_to list.len
         elif KEY_Enter.IsKeyPressed:  invoke self.hentry
         elif KEY_Insert.IsKeyPressed: switch_selection(hline); scroll 1
-        elif KEY_KP_Enter.IsKeyPressed:  select_inverted()
-        elif KEY_KP_Divide.IsKeyPressed: chdir(direxit.name); abort()
+        elif KEY_KP_Enter.IsKeyPressed:   select_inverted()
+        elif KEY_KP_Decimal.IsKeyPressed: chdir(direxit.name); abort()
         else:
         # Gamepad controls.
             case GetGamepadButtonPressed():
@@ -425,7 +426,8 @@ when not defined(CommandLine):
         log, history: seq[string]
         fullscreen, through_req, input_changed: bool
     const 
-        max_log = 99999
+        max_log  = 99999
+        max_hist = 99999
         exit_hint = " ESC to return "
 
     # --Properties:
@@ -456,6 +458,7 @@ when not defined(CommandLine):
         else: startProcess "/bin/bash", dir_feed().path, [command, "|| exit"]
         input = ""
         if history.len == 0 or history[^1] != command: history.add(command)
+        history   = history.limit(max_hist) # Memory saving.
         backtrack = history.len
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
@@ -492,11 +495,12 @@ when not defined(CommandLine):
                     if chr in ['\n']: log.add("")
                     elif chr != '\c': log[^1] &= chr.`$`.convert(srcEncoding = cmd_cp)
                     if (getTime()-start).inMilliseconds > 100: break
-                if log.len > max_log: log = log[log.len-max_log..^1] # Memory saving.
-                if not shell.running: 
+                log = log.limit max_log # Memory saving.
+                if not (shell.running or shell.hasData): 
                     if log[^1] == "": discard log.pop
                     shell = nil
                 scroll(log.len)
+        #  Main controls.
         if self.exclusive: # Scrolling controls.
             scroll -GetMouseWheelMove()     # Mouse controls
             case GetGamepadButtonPressed(): # Gamepad & keyboard controls.
@@ -916,8 +920,8 @@ when not defined(FileViewer):
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: linecount = cache.len-1
-                    hexpos_edge = (&"{feedsize:X}").len     # Should only be calculated here for performace.
-                    y = max(0, min(y, linecount-self.vcap)) # Post-poned Y position update.
+                    hexpos_edge = (&"{feedsize:X}").len       # Should only be calculated here for performace.
+                    y = max(0, min(y, linecount-self.vcap+1)) # Postponed Y position update.
                     if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
                     (linecount, y, hexpos_edge) = (0, 0, 0)
@@ -1033,7 +1037,9 @@ when not defined(MultiViewer):
         watcher:   ProgressWatch
         current, f_key: int
         dirty, quick_search: bool
-    const hint_width  = 6
+    const 
+        hint_width = 6
+        max_errlog = 99999
 
     # --Properties:
     template active(self: MultiViewer): DirViewer      = self.viewers[self.current]
@@ -1068,6 +1074,7 @@ when not defined(MultiViewer):
     proc register_err(self: MultiViewer, err: ref Exception) =
         error = (msg: err.msg, time: getTime())
         if not (err of ReraiseError): errorlog.add(error)
+        errorlog = errorlog.limit(max_errlog)
 
     proc reset_watcher(self: MultiViewer, op = "") =
         watcher = newProgressWatch(host, self, op)
