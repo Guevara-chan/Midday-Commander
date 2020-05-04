@@ -343,7 +343,8 @@ when not defined(DirViewer):
         elif KEY_Right.IsKeyPressed:  scroll_to list.len
         elif KEY_Enter.IsKeyPressed:  invoke self.hentry
         elif KEY_Insert.IsKeyPressed: switch_selection(hline); scroll 1
-        elif KEY_KP_Enter.IsKeyPressed: select_inverted()
+        elif KEY_KP_Enter.IsKeyPressed:  select_inverted()
+        elif KEY_KP_Divide.IsKeyPressed: chdir(direxit.name); abort()
         else:
         # Gamepad controls.
             case GetGamepadButtonPressed():
@@ -439,6 +440,10 @@ when not defined(CommandLine):
     proc record(self: CommandLine, line: string) =
         log.add(line); scroll log.len
 
+    proc exhume(self: Commandline, shift = 0) =
+        backtrack = max(0, min(backtrack+shift, history.len))
+        input = if backtrack == history.len: "" else: history[backtrack]
+
     proc record(self: CommandLine, lines: openArray[string]) =
         for line in lines: log.add(line)
         scroll log.len
@@ -450,7 +455,7 @@ when not defined(CommandLine):
               startProcess "cmd.exe",   dir_feed().path, ["/c", command], nil, {poStdErrToStdOut, poDaemon}
         else: startProcess "/bin/bash", dir_feed().path, [command, "|| exit"]
         input = ""
-        history.add(command)
+        if history.len == 0 or history[^1] != command: history.add(command)
         backtrack = history.len
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
@@ -483,12 +488,13 @@ when not defined(CommandLine):
             if not shell.isNil:
                 while shell.hasData:
                     let chr = shell.outputStream.readChar
-                    if chr in ['\n']: log.add("") #record line_buffer.convert(srcEncoding = cmd_cp); line_buffer = ""
-                    elif chr != '\c': log[^1] &= chr.`$`.convert(srcEncoding = cmd_cp) #line_buffer &= $chr
-                if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
+                    if chr in ['\n']: log.add("")
+                    elif chr != '\c': log[^1] &= chr.`$`.convert(srcEncoding = cmd_cp)
+                if log.len > max_log: log = log[log.len-max_log..^1] # Memory saving.
                 if not shell.running: 
                     if log[^1] == "": discard log.pop
                     shell = nil
+                scroll(log.len)
         if self.exclusive: # Scrolling controls.
             scroll -GetMouseWheelMove()     # Mouse controls
             case GetGamepadButtonPressed(): # Gamepad & keyboard controls.
@@ -500,7 +506,7 @@ when not defined(CommandLine):
                 elif KEY_Up.IsKeyDown:            (if norepeat(): scroll -1)
                 elif KEY_Down.IsKeyDown:          (if norepeat(): scroll +1)
                 elif KEY_Pause.IsKeyPressed:      (if self.running: shell.kill)
-            if key > 0: shell.inputStream.write($(key.Rune))
+            if key != 0: shell.inputStream.write($(key.Rune))
         else: # Input controls.
             if input != "": # Backspace only if there are text to remove.
                 if KEY_Backspace.IsKeyDown: # Delete last char.
@@ -510,8 +516,10 @@ when not defined(CommandLine):
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
                 else: input = ""
             elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort() # Cancel request mode.
-            elif shift_down() and KEY_Insert.IsKeyPressed: paste $GetClipboardText(); abort()
-            if key > 0: paste($(key.Rune))
+            elif shift_down() and KEY_Insert.IsKeyPressed:   paste $GetClipboardText(); abort()
+            elif KEY_KP_8.IsKeyPressed: exhume -1
+            elif KEY_KP_2.IsKeyPressed: exhume +1
+            elif key != 0: paste($(key.Rune))
         # Finalization.
         return self
 
@@ -654,8 +662,8 @@ when not defined(ProgressWatch):
     proc newProgressWatch(term: TerminalEmu, creator: Area, op = ""): ProgressWatch =
         ProgressWatch(host: term, parent: creator, operation: op,start: getTime(), frameskip: true)
 # -------------------- #
-when not defined(CtxMenu):
-    type CtxMenu = ref object of Area
+when not defined(CotextMenu):
+    type ContextMenu = ref object of Area
         host:  TerminalEmu
 # -------------------- #
 when not defined(FileViewer):

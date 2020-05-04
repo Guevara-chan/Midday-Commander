@@ -29,10 +29,10 @@ when not defined(TerminalEmu):
         margin*, max_fps*, min_width, min_height: int
 
     # --Properties.
-    template hlines*(self: TerminalEmu): int = GetScreenWidth() div self.cell.x.int
+    template hlines*(self: TerminalEmu): int = GetScreenWidth()  div self.cell.x.int
     template vlines*(self: TerminalEmu): int = GetScreenHeight() div self.cell.y.int
-    template hpos*(self: TerminalEmu): int = (self.cur.x / self.cell.x).int
-    template vpos*(self: TerminalEmu): int = (self.cur.y / self.cell.y).int
+    template hpos*(self: TerminalEmu): int   = (self.cur.x / self.cell.x).int
+    template vpos*(self: TerminalEmu): int   = (self.cur.y / self.cell.y).int
 
     proc focused*(self: TerminalEmu): bool =
         when defined(windows):
@@ -56,6 +56,7 @@ when not defined(TerminalEmu):
             fg_stack = @[fg]
         # Render template.
         template render_rext(chunk: string) =
+            let denom = chunk[0]
             if ctrl:                                         # Control arg.
                 let lead = chunk.runeAt(0).int 
                 if lead != 255 and lead != 160:
@@ -63,8 +64,9 @@ when not defined(TerminalEmu):
                     fg_stack.add(self.fg)
                 elif fg_stack.len > 1: discard fg_stack.pop; fg = fg_stack[^1]
                 ctrl = false
-            elif chunk[0] == '\a' and not raw: ctrl = true   # Control character.
-            elif raw or chunk[0] != '\n':
+            elif denom == '\a' and not raw: ctrl = true     # Control character.
+            elif denom == '\b' and not raw: cur.x -= cell.x # Backspace.
+            elif raw or denom != '\n':
                 let width = cell.x * chunk.runeLen.float
                 cur.DrawRectangleV(Vector2(x: width, y: cell.y), self.bg)
                 font.DrawTextEx(chunk, self.cur, self.font.baseSize.float32, 0, self.fg)
