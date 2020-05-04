@@ -415,13 +415,13 @@ when not defined(DirViewer):
 # -------------------- #
 when not defined(CommandLine):
     type CommandLine = ref object of Area
-        host:   TerminalEmu
-        log:    seq[string]
-        shell:  Process
-        origin: int
-        dir_feed:   proc(): DirViewer
-        prompt_cb:  proc(name: string)
+        host:      TerminalEmu
+        shell:     Process
+        dir_feed:  proc(): DirViewer
+        prompt_cb: proc(name: string)
         input, prompt: string
+        origin, backtrack: int
+        log, history: seq[string]
         fullscreen, through_req, input_changed: bool
     const 
         max_log = 99999
@@ -450,6 +450,8 @@ when not defined(CommandLine):
               startProcess "cmd.exe",   dir_feed().path, ["/c", command], nil, {poStdErrToStdOut, poDaemon}
         else: startProcess "/bin/bash", dir_feed().path, [command, "|| exit"]
         input = ""
+        history.add(command)
+        backtrack = history.len
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
         if not self.requesting: prompt = hint; input = def_input; prompt_cb = cb
@@ -651,6 +653,10 @@ when not defined(ProgressWatch):
 
     proc newProgressWatch(term: TerminalEmu, creator: Area, op = ""): ProgressWatch =
         ProgressWatch(host: term, parent: creator, operation: op,start: getTime(), frameskip: true)
+# -------------------- #
+when not defined(CtxMenu):
+    type CtxMenu = ref object of Area
+        host:  TerminalEmu
 # -------------------- #
 when not defined(FileViewer):
     type DataLine   = tuple[origin: int, data: string]
