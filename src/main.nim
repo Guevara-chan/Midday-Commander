@@ -484,6 +484,9 @@ when not defined(CommandLine):
                     if chr in ['\n']: log.add("") #record line_buffer.convert(srcEncoding = cmd_cp); line_buffer = ""
                     elif chr != '\c': log[^1] &= chr.`$`.convert(srcEncoding = cmd_cp) #line_buffer &= $chr
                 if log.len > max_log: log = log[log.len-max_log..^1]; scroll(log.len) # Memory saving.
+                if not shell.running: 
+                    if log[^1] == "": discard log.pop
+                    shell = nil
         if self.exclusive: # Scrolling controls.
             scroll -GetMouseWheelMove()     # Mouse controls
             case GetGamepadButtonPressed(): # Gamepad & keyboard controls.
@@ -1150,7 +1153,7 @@ when not defined(MultiViewer):
             else: self.active.switch_selection(idx, 0)
             self.active.dirty = true
 
-    proc receive(self: MultiViewer, list: seq[string]) =
+    proc receive(self: MultiViewer, list: openArray[string]) =
         # Init setup.
         var last_transferred: string
         reset_watcher()
