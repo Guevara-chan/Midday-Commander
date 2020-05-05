@@ -668,9 +668,16 @@ when not defined(ProgressWatch):
     proc newProgressWatch(term: TerminalEmu, creator: Area, op = ""): ProgressWatch =
         ProgressWatch(host: term, parent: creator, operation: op,start: getTime(), frameskip: true)
 # -------------------- #
-when not defined(CotextMenu):
+when not defined(ContextMenu):
+    type CtxAction   = tuple[repr, command: string]
     type ContextMenu = ref object of Area
-        host:  TerminalEmu
+        host:    TerminalEmu
+        options: seq[CtxAction]
+        hline:   int
+
+    # --Methods goes here:
+    proc newContextMenu(term: TerminalEmu): ContextMenu =
+        ContextMenu(host: term)
 # -------------------- #
 when not defined(FileViewer):
     type DataLine   = tuple[origin: int, data: string]
