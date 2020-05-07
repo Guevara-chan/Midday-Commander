@@ -41,14 +41,13 @@ const core_help* = [
     "\a\x01===================================================================================",
     "                                \a\x03.[\a\xffGamepad controls\a\x03].",
     "\a\x01===================================================================================",
-    "\a\x07DPad-\a\x02Up:\a\x01      move selection/view 1 line up",
-    "\a\x07DPad-\a\x02Down:\a\x01    move selection/view 1 line down ",
-    "\a\x07DPad-\a\x02Left:\a\x01    move to begin of listing",
-    "\a\x07DPad-\a\x02Right:\a\x01   move to end of listing",
+    "\a\x07DPad|\a\x02Up:\a\x01      move selection/view 1 line up",
+    "\a\x07DPad|\a\x02Down:\a\x01    move selection/view 1 line down ",
+    "\a\x07DPad|\a\x02Left:\a\x01    move to begin of listing",
+    "\a\x07DPad|\a\x02Right:\a\x01   move to end of listing",
     "\a\x02A\a\x07\x1D\a\xffCross:\a\x01      browse hilited dir OR run hilited file OR confirm alert choice",
     "\a\x02B\a\x07\x1D\a\xffCircle:\a\x01     deny alert choice",
     "\a\x02Y\a\x07\x1D\a\xffTriangle:\a\x01   delete selected entri(s)",
     "\a\x02RB\a\x07\x1D\a\xffR1:\a\x01        select next directory viewer",
     "\a\x02Back\a\x07\x1D\a\xffSelect:\a\x01  cancel task",
-    "."
     ]

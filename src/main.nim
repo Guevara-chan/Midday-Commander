@@ -19,6 +19,7 @@ when not defined(Meta):
     template undot(ext: string): string                            = ext.dup(removePrefix('.'))
     template fit(txt: string, size: int, filler = ' '): string     = txt.align(size, filler.Rune).runeSubStr 0, size
     template fit_left(txt: string, size: int, filler = ' '): string= txt.alignLeft(size, filler.Rune).runeSubStr 0,size
+    template limit[T](value, higher: T, lower = 0): T              = max(lower, min(higher, value))
     template limit[T](list: seq[T], lim: int): seq[T] = (if list.len > lim: list[list.len-lim..^1] else: list)
 
     proc check_droplist(): seq[string] =
@@ -206,9 +207,8 @@ when not defined(DirViewer):
 
     # --Methods goes here:
     proc scroll_to(self: DirViewer, pos = 0): auto {.discardable.} =
-        hline = max(0, min(pos, list.len - 1))
-        origin = if hline >= origin + self.capacity: hline - self.capacity + 1
-        else: min(origin, hline)
+        hline      = pos.limit(list.len - 1)
+        origin     = if hline >= origin + self.capacity: hline - self.capacity + 1 else: min(origin, hline)
         hl_changed = true
         return self
 
@@ -437,13 +437,13 @@ when not defined(CommandLine):
 
     # --Methods goes here:
     proc scroll(self: CommandLine, shift: int) =
-        origin = max(0, min(origin + shift, log.len - host.vlines))
+        origin = limit(origin + shift, log.len - host.vlines)
 
     proc record(self: CommandLine, line: string) =
         log.add(line); scroll log.len
 
     proc exhume(self: Commandline, shift = 0) =
-        backtrack = max(0, min(backtrack+shift, history.len))
+        backtrack = limit(backtrack + shift, history.len)
         input = if backtrack == history.len: "" else: history[backtrack]
 
     proc record(self: CommandLine, lines: openArray[string]) =
@@ -606,7 +606,7 @@ when not defined(Alert):
 # -------------------- #
 when not defined(ProgressWatch):
     type ProgressWatch = ref object of Area
-        host:   TerminalEmu
+        host:  TerminalEmu
         ticks: int
         start, frame_start: Time
         operation, status: string
@@ -673,11 +673,29 @@ when not defined(ContextMenu):
     type ContextMenu = ref object of Area
         host:    TerminalEmu
         options: seq[CtxAction]
-        hline:   int
+        hline, origin: int
+
+    # --Properties:
+    template capacity(sel: ContextMenu): int = host.vlines - 6
 
     # --Methods goes here:
-    proc newContextMenu(term: TerminalEmu): ContextMenu =
-        ContextMenu(host: term)
+    proc scroll(self: ContextMenu, shift: int) =
+        hline  = max(0, hline + shift)
+        origin = if hline >= origin + self.capacity: hline - self.capacity + 1 else: min(origin, hline)
+
+    method update(self: ContextMenu): Area {.discardable.} =
+        # Keyboard controls.
+        if   KEY_Up.IsKeyDown:   (if norepeat(): scroll -1)
+        elif KEY_Down.IsKeyDown: (if norepeat(): scroll +1)
+        # Finalization.
+        return self
+
+    method render(self: ContextMenu): Area {.discardable.} =
+        parent.render()
+        return self
+
+    proc newContextMenu(term: TerminalEmu, creator: Area, opt_tree: seq[CtxAction]): ContextMenu =
+        ContextMenu(host: term, parent: creator, options: opt_tree)
 # -------------------- #
 when not defined(FileViewer):
     type DataLine   = tuple[origin: int, data: string]
@@ -748,10 +766,10 @@ when not defined(FileViewer):
 
     proc vscroll(self: FileViewer, shift = 0) =
         y += shift # Check is postponed due to uncertain nature.
-        pos = max(0, min(feedsize-self.hexcells, pos+self.hexcap*shift))
+        pos = limit(pos+self.hexcap*shift, feedsize-self.hexcells)
 
     proc hscroll(self: FileViewer, shift = 0) =
-        x = max(0, min(self.right_edge, x + shift))
+        x = limit(x + shift, self.right_edge)
 
     proc dir_checkout(self: FileViewer, path: string): string =
         # Init setup.
@@ -927,8 +945,8 @@ when not defined(FileViewer):
                     if (getTime() - start).inMilliseconds > 100 and not fullscreen: break # To not hang process.
                 if cache.len > 0: # If there was any data.
                     if feed.atEnd: linecount = cache.len-1
-                    hexpos_edge = (&"{feedsize:X}").len       # Should only be calculated here for performace.
-                    y = max(0, min(y, linecount-self.vcap+1)) # Postponed Y position update.
+                    hexpos_edge = (&"{feedsize:X}").len # Should only be calculated here for performace.
+                    y = y.limit(linecount-self.vcap+1)  # Postponed Y position update.
                     if self.data_piped: "ANSI" elif lense_switch xor '\0' in cache[0].data: "HEX" else: "ASCII"
                 else: # Special handling for 0-size files.
                     (linecount, y, hexpos_edge) = (0, 0, 0)
@@ -941,7 +959,7 @@ when not defined(FileViewer):
                 for checkpoint in walker:
                     if checkpoint == -1: walker = nil; break
                     if (getTime() - start).inMilliseconds > 25: break
-        # Mouse controls.
+        # Mouse-based controls.
         let (x, y) = host.pick()
         if self.active:
             vscroll -GetMouseWheelMove()
@@ -955,6 +973,7 @@ when not defined(FileViewer):
                 of FVControls.lense:    cycle_lenses()      # Switch view mode on inspector tag click.
                 of FVControls.minmax:   switch_fullscreen() # Switch between preview & full modes.
                 elif self.active: f_key = fkey_feed(x, y)   # Command buttons picking.
+        # Key-based controls.
         if self.active:
             # Keyboard controls.
             if   KEY_PageUp.IsKeyDown:    (if norepeat(): vscroll -self.vcap)
