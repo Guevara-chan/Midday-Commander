@@ -345,7 +345,6 @@ when not defined(DirViewer):
         elif KEY_Enter.IsKeyPressed:  invoke self.hentry
         elif KEY_Insert.IsKeyPressed: switch_selection(hline); scroll 1
         elif KEY_KP_Enter.IsKeyPressed:   select_inverted()
-        elif KEY_KP_Decimal.IsKeyPressed: chdir(direxit.name); abort()
         else:
         # Gamepad controls.
             case GetGamepadButtonPressed():
@@ -474,6 +473,11 @@ when not defined(CommandLine):
     proc end_request(self: CommandLine) =
         prompt = ""; input = ""; through_req = false
 
+    proc cut(self: CommandLine, idx = -1, amount = 1): string {.discardable.} =
+        let index = if idx < 0: input.runeLen + idx else: idx
+        if input.len >= amount: input = input.runeSubstr(0, index) & input.runeSubstr(index + amount)
+        input_changed = true
+
     proc paste(self: CommandLine, text: string) =
         input &= text; input_changed = true
 
@@ -514,13 +518,11 @@ when not defined(CommandLine):
                 elif KEY_Pause.IsKeyPressed:      (if self.running: shell.kill)
             if key != 0: shell.inputStream.write($(key.Rune))
         else: # Input controls.
-            if input != "": # Backspace only if there are text to remove.
-                if KEY_Backspace.IsKeyDown: # Delete last char.
-                    if norepeat(): input = input.runeSubstr(0, input.runeLen-1); input_changed = true
             if KEY_Enter.IsKeyPressed: # Input actualization.
                 if not through_req:
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
                 else: input = ""
+            elif KEY_Backspace.IsKeyDown: (if norepeat(): cut()) # Cut last char.            
             elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort() # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste $GetClipboardText(); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
@@ -1327,12 +1329,13 @@ when not defined(MultiViewer):
                     elif f_key==8 or KEY_F8.IsKeyPressed:   request_deletion()
                     elif f_key==10 or KEY_F10.IsKeyPressed: quit()
                 # Extra controls.
-                if KEY_Home.IsKeyPressed:               request_navigation()
-                elif KEY_Tab.IsKeyPressed:              select(self.next_index)
-                elif KEY_End.IsKeyPressed:              cmdline.paste(self.active.hpath)
-                elif KEY_KP_Add.IsKeyPressed:           request_sel_management()
-                elif KEY_KP_Subtract.IsKeyPressed:      request_sel_management(false)
-                elif KEY_Right_Alt.IsKeyPressed:        switch_quick_search()
+                if KEY_Home.IsKeyPressed:             request_navigation()
+                elif KEY_Tab.IsKeyPressed:            select(self.next_index)
+                elif KEY_End.IsKeyPressed:            cmdline.paste(self.active.hpath)
+                elif KEY_KP_Add.IsKeyPressed:         request_sel_management()
+                elif KEY_KP_Subtract.IsKeyPressed:    request_sel_management(false)
+                elif KEY_KP_Decimal.IsKeyPressed:     self.active.chdir(direxit.name); cmdline.cut()
+                elif KEY_Right_Alt.IsKeyPressed:      switch_quick_search()
                 # Gamepad controls
                 elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_TRIGGER_1): select(self.next_index)
                 elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_FACE_UP):   request_deletion()
