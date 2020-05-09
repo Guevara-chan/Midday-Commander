@@ -481,7 +481,9 @@ when not defined(CommandLine):
             input_changed = true
 
     proc paste(self: CommandLine, text: string, idx = -1) =
-        input &= text; input_changed = true
+        let index = if idx < 0: input.runeLen + idx + 1 else: idx
+        input = [input.runeSubstr(0, index), text, input.runeSubstr(index)].join()
+        input_changed = true
 
     method update(self: CommandLine): Area {.discardable.} =
         # Init setup.
@@ -536,7 +538,7 @@ when not defined(CommandLine):
     method render(self: CommandLine): Area {.discardable.} =
         # Output log.
         if self.exclusive: 
-            for line in log[origin..<min(log.len, origin+host.hlines)]: host.write [line, $'\n'], GRAY
+            for line in log[origin..<min(log.len, origin+host.hlines)]: host.write [line, "\n"], GRAY
             if fullscreen: host.with loc(host.hlines - exit_hint.len, 0), write(exit_hint, BLACK, DARKGRAY)
             return
         # Commandline.
@@ -1361,7 +1363,6 @@ when not defined(MultiViewer):
             if (getTime() - error.time).inSeconds > 2: error.msg = ""
         except: # Error message
             register_err(getCurrentException())        
-            #error = (msg: getCurrentExceptionMsg().splitLines[0], time: getTime())
             for viewer in viewers: (if viewer.dirty: viewer.refresh().scroll_to(viewer.hline))        
         host.limit_fps(if host.focused: 60 else: 5)
         return self
