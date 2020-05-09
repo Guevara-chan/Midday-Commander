@@ -475,10 +475,12 @@ when not defined(CommandLine):
 
     proc cut(self: CommandLine, idx = -1, amount = 1): string {.discardable.} =
         let index = if idx < 0: input.runeLen + idx else: idx
-        if input.len >= amount: input = input.runeSubstr(0, index) & input.runeSubstr(index + amount)
-        input_changed = true
+        if input.len >= index + amount: 
+            result = input.runeSubstr(index, amount)
+            input  = input.runeSubstr(0, index) & input.runeSubstr(index + amount)
+            input_changed = true
 
-    proc paste(self: CommandLine, text: string) =
+    proc paste(self: CommandLine, text: string, idx = -1) =
         input &= text; input_changed = true
 
     method update(self: CommandLine): Area {.discardable.} =
