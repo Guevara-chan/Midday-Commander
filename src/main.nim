@@ -473,23 +473,26 @@ when not defined(CommandLine):
     proc end_request(self: CommandLine) =
         prompt = ""; input = ""; through_req = false
 
+    proc loc(self: CommandLine, new_pos = 0) =
+        cpos = new_pos.limit input.runeLen
+
     proc cut(self: CommandLine, idx = int.high, amount = int.high): string {.discardable.} =
         let 
             start  = min(input.runeLen - 1, idx)
             length = min(input.runeLen - start, amount)
         if input.runeLen >= start + length: 
-            cpos   = start
             result = input.runeSubstr(start, length)
             input  = input.runeSubstr(0, start) & input.runeSubstr(start + length)
             input_changed = true
+            loc(start)
 
     proc paste(self: CommandLine, data: auto, idx = -1) =
         let 
             index = if idx < 0: input.runeLen + idx + 1 else: idx
             text  = $data
-        input         = [input.runeSubstr(0, index), text, input.runeSubstr(index)].join()
-        cpos          = index + text.runeLen
+        input = [input.runeSubstr(0, index), text, input.runeSubstr(index)].join()
         input_changed = true
+        loc(index + text.runeLen)
 
     method update(self: CommandLine): Area {.discardable.} =
         # Init setup.
