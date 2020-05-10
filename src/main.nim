@@ -421,8 +421,8 @@ when not defined(CommandLine):
         dir_feed:  proc(): DirViewer
         prompt_cb: proc(name: string)
         input, prompt: string
-        origin, backtrack: int
         log, history: seq[string]
+        origin, backtrack, cpos: int
         fullscreen, through_req, input_changed: bool
     const 
         max_log  = 99999
@@ -478,13 +478,17 @@ when not defined(CommandLine):
             start  = min(input.runeLen - 1, idx)
             length = min(input.runeLen - start, amount)
         if input.runeLen >= start + length: 
+            cpos   = start
             result = input.runeSubstr(start, length)
             input  = input.runeSubstr(0, start) & input.runeSubstr(start + length)
             input_changed = true
 
-    proc paste(self: CommandLine, text: string, idx = -1) =
-        let index = if idx < 0: input.runeLen + idx + 1 else: idx
-        input = [input.runeSubstr(0, index), text, input.runeSubstr(index)].join()
+    proc paste(self: CommandLine, data: auto, idx = -1) =
+        let 
+            index = if idx < 0: input.runeLen + idx + 1 else: idx
+            text  = $data
+        input         = [input.runeSubstr(0, index), text, input.runeSubstr(index)].join()
+        cpos          = index + text.runeLen
         input_changed = true
 
     method update(self: CommandLine): Area {.discardable.} =
@@ -529,12 +533,12 @@ when not defined(CommandLine):
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
                 else: input = ""
             elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut(0)) # Cut all chars.
-            elif KEY_Backspace.IsKeyDown: (if norepeat(): cut())                     # Cut last char.
+            elif KEY_Backspace.IsKeyDown: (if norepeat(): cut(cpos, 1))              # Cut last char.
             elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()  # Cancel request mode.
-            elif shift_down() and KEY_Insert.IsKeyPressed:   paste $GetClipboardText(); abort()
+            elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), cpos); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
             elif KEY_KP_2.IsKeyPressed: exhume +1
-            elif key != 0: paste($(key.Rune))
+            elif key != 0: paste(key.Rune, cpos)
         # Finalization.
         return self
 
