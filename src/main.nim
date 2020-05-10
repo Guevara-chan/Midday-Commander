@@ -473,11 +473,13 @@ when not defined(CommandLine):
     proc end_request(self: CommandLine) =
         prompt = ""; input = ""; through_req = false
 
-    proc cut(self: CommandLine, idx = -1, amount = 1): string {.discardable.} =
-        let index = if idx < 0: input.runeLen + idx else: idx
-        if input.len >= index + amount: 
-            result = input.runeSubstr(index, amount)
-            input  = input.runeSubstr(0, index) & input.runeSubstr(index + amount)
+    proc cut(self: CommandLine, idx = int.high, amount = int.high): string {.discardable.} =
+        let 
+            start  = min(input.runeLen - 1, idx)
+            length = min(input.runeLen - start, amount)
+        if input.runeLen >= start + length: 
+            result = input.runeSubstr(start, length)
+            input  = input.runeSubstr(0, start) & input.runeSubstr(start + length)
             input_changed = true
 
     proc paste(self: CommandLine, text: string, idx = -1) =
@@ -526,8 +528,9 @@ when not defined(CommandLine):
                 if not through_req:
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
                 else: input = ""
-            elif KEY_Backspace.IsKeyDown: (if norepeat(): cut()) # Cut last char.            
-            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort() # Cancel request mode.
+            elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut(0)) # Cut all chars.
+            elif KEY_Backspace.IsKeyDown: (if norepeat(): cut())                     # Cut last char.
+            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()  # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste $GetClipboardText(); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
             elif KEY_KP_2.IsKeyPressed: exhume +1
