@@ -438,6 +438,9 @@ when not defined(CommandLine):
     proc scroll(self: CommandLine, shift: int) =
         origin = limit(origin + shift, log.len - host.vlines)
 
+    proc loc(self: CommandLine, new_pos = 0) =
+        cpos = new_pos.limit input.runeLen
+
     proc record(self: CommandLine, line: string) =
         log.add(line); scroll log.len
 
@@ -449,34 +452,7 @@ when not defined(CommandLine):
         for line in lines: log.add(line)
         scroll log.len
 
-    proc shell(self: CommandLine, cmd: string = "") =
-        let command = (if cmd != "": cmd else: input)
-        record [&"\a\x03>>\a\x04{command}", ""]
-        shell = when defined(windows): 
-              startProcess "cmd.exe",   dir_feed().path, ["/c", command], nil, {poStdErrToStdOut, poDaemon}
-        else: startProcess "/bin/bash", dir_feed().path, [command, "|| exit"]
-        input = ""
-        if history.len == 0 or history[^1] != command: history.add(command)
-        history   = history.limit(max_hist) # Memory saving.
-        backtrack = history.len
-
-    proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
-        if not self.requesting: prompt = hint; input = def_input; prompt_cb = cb
-
-    proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
-        request hint, "", cb
-
-    proc through_request(self: CommandLine, hint: string) =
-        proc void(faux: string) = discard
-        request(hint, void); through_req = true
-
-    proc end_request(self: CommandLine) =
-        prompt = ""; input = ""; through_req = false
-
-    proc loc(self: CommandLine, new_pos = 0) =
-        cpos = new_pos.limit input.runeLen
-
-    proc cut(self: CommandLine, idx = int.high, amount = int.high): string {.discardable.} =
+    proc cut(self: CommandLine, idx = 0, amount = int.high): string {.discardable.} =
         let 
             start  = min(input.runeLen - 1, idx)
             length = min(input.runeLen - start, amount)
@@ -493,6 +469,30 @@ when not defined(CommandLine):
         input = [input.runeSubstr(0, index), text, input.runeSubstr(index)].join()
         input_changed = true
         loc(index + text.runeLen)
+
+    proc shell(self: CommandLine, cmd: string = "") =
+        let command = (if cmd != "": cmd else: input)
+        record [&"\a\x03>>\a\x04{command}", ""]
+        shell = when defined(windows): 
+              startProcess "cmd.exe",   dir_feed().path, ["/c", command], nil, {poStdErrToStdOut, poDaemon}
+        else: startProcess "/bin/bash", dir_feed().path, [command, "|| exit"]
+        cut()
+        if history.len == 0 or history[^1] != command: history.add(command)
+        history   = history.limit(max_hist) # Memory saving.
+        backtrack = history.len
+
+    proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
+        if not self.requesting: prompt = hint; input = def_input; prompt_cb = cb
+
+    proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
+        request hint, "", cb
+
+    proc through_request(self: CommandLine, hint: string) =
+        proc void(faux: string) = discard
+        request(hint, void); through_req = true
+
+    proc end_request(self: CommandLine) =
+        prompt = ""; cut(); through_req = false
 
     method update(self: CommandLine): Area {.discardable.} =
         # Init setup.
@@ -534,10 +534,10 @@ when not defined(CommandLine):
             if KEY_Enter.IsKeyPressed: # Input actualization.
                 if not through_req:
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
-                else: input = ""
-            elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut(0)) # Cut all chars.
-            elif KEY_Backspace.IsKeyDown: (if norepeat(): cut(cpos, 1))              # Cut last char.
-            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()  # Cancel request mode.
+                else: cut()
+            elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut())        # Cut all chars.
+            elif KEY_Backspace.IsKeyDown:                    (if norepeat(): cut(cpos, 1)) # Cut last char.
+            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()        # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), cpos); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
             elif KEY_KP_2.IsKeyPressed: exhume +1
