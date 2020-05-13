@@ -441,17 +441,6 @@ when not defined(CommandLine):
     proc loc(self: CommandLine, new_pos = 0) =
         cpos = new_pos.limit input.runeLen
 
-    proc record(self: CommandLine, line: string) =
-        log.add(line); scroll log.len
-
-    proc exhume(self: Commandline, shift = 0) =
-        backtrack = limit(backtrack + shift, history.len)
-        input = if backtrack == history.len: "" else: history[backtrack]
-
-    proc record(self: CommandLine, lines: openArray[string]) =
-        for line in lines: log.add(line)
-        scroll log.len
-
     proc cut(self: CommandLine, idx = 0, amount = int.high): string {.discardable.} =
         let 
             start  = min(input.runeLen - 1, idx)
@@ -469,6 +458,18 @@ when not defined(CommandLine):
         input = [input.runeSubstr(0, index), text, input.runeSubstr(index)].join()
         input_changed = true
         loc(index + text.runeLen)
+
+    proc exhume(self: Commandline, shift = 0) =
+        backtrack = limit(backtrack + shift, history.len)
+        input = if backtrack == history.len: "" else: history[backtrack]
+        loc(input.runeLen)
+
+    proc record(self: CommandLine, line: string) =
+        log.add(line); scroll log.len
+
+    proc record(self: CommandLine, lines: openArray[string]) =
+        for line in lines: log.add(line)
+        scroll log.len
 
     proc shell(self: CommandLine, cmd: string = "") =
         let command = (if cmd != "": cmd else: input)
@@ -564,9 +565,9 @@ when not defined(CommandLine):
         host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines: "…" else: " ",
             if full_len >= host.hlines: input.runeSubstr(-(host.hlines-prefix_len-2)) else: input], Color(), BLACK
         # Selection.
+        let blink = getTime().toUnix %% 2 == 1
         host.loc(host.hpos - (input.runeLen - cpos), host.vpos)
-        if cpos >= input.runeLen: 
-            host.write (if getTime().toUnix %% 2 == 1: "_" else: "")
+        if cpos == input.runeLen: host.write (if blink: "_" else: "")
         else: host.write input.runeAt(cpos).`$`, Black, Lime
         host.write("\n")
         # Finalization.
