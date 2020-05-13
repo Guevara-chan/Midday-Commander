@@ -541,6 +541,8 @@ when not defined(CommandLine):
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), cpos); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
             elif KEY_KP_2.IsKeyPressed: exhume +1
+            elif KEY_KP_4.IsKeyPressed: loc(cpos-1)
+            elif KEY_KP_6.IsKeyPressed: loc(cpos+1)
             elif key != 0: paste(key.Rune, cpos)
         # Finalization.
         return self
@@ -560,8 +562,13 @@ when not defined(CommandLine):
         let prefix_len = host.hpos() + 2 # 2 - for additonal symbol and pointer.
         let full_len = prefix_len + input.runeLen
         host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines: "…" else: " ",
-            if full_len >= host.hlines: input.runeSubstr(-(host.hlines-prefix_len-2)) else: input, 
-                (if getTime().toUnix %% 2 == 1: "_" else: ""), "\n"], Color(), BLACK
+            if full_len >= host.hlines: input.runeSubstr(-(host.hlines-prefix_len-2)) else: input], Color(), BLACK
+        # Selection.
+        host.loc(host.hpos - (input.runeLen - cpos), host.vpos)
+        if cpos >= input.runeLen: 
+            host.write (if getTime().toUnix %% 2 == 1: "_" else: "")
+        else: host.write input.runeAt(cpos).`$`, Black, Lime
+        host.write("\n")
         # Finalization.
         return self
 
