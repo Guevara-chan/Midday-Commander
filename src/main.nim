@@ -542,8 +542,8 @@ when not defined(CommandLine):
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), cpos); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
             elif KEY_KP_2.IsKeyPressed: exhume +1
-            elif KEY_KP_4.IsKeyPressed: loc(cpos-1)
-            elif KEY_KP_6.IsKeyPressed: loc(cpos+1)
+            elif KEY_KP_4.IsKeyDown: (if norepeat(): loc(cpos-1))
+            elif KEY_KP_6.IsKeyDown: (if norepeat(): loc(cpos+1))
             elif key != 0: paste(key.Rune, cpos)
         # Finalization.
         return self
