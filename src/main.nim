@@ -1,5 +1,5 @@
 import os, osproc, strutils, algorithm, sequtils, times, random, streams, sugar, strformat, encodings, tables, browsers
-from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAt, capitalize, reversed, `==`, `$`
+from unicode import Rune, runes, align, alignLeft, runeSubStr, runeLen, runeAtPos, capitalize, reversed, `==`, `$`
 import std/with, winlean, auxiliary/colors, auxiliary/help, rayterm, raylib
 {.this: self.}
 
@@ -56,7 +56,7 @@ when not defined(Meta):
                 case chr:
                     of '?'.Rune: discard
                     of '*'.Rune: return part.endsWith(pattern.runeSubstr(idx+1))
-                    elif chr != part.runeAt(idx): return false 
+                    elif chr != part.runeAtPos(idx): return false 
                 idx.inc
             return true
         let 
@@ -422,7 +422,7 @@ when not defined(CommandLine):
         prompt_cb: proc(name: string)
         input, prompt: string
         log, history: seq[string]
-        origin, backtrack, cpos: int
+        origin, backtrack, ipos, iorigin: int
         fullscreen, through_req, input_changed: bool
     const 
         max_log  = 99999
@@ -433,13 +433,15 @@ when not defined(CommandLine):
     template running(self: CommandLine): bool    = not self.shell.isNil and self.shell.running
     template exclusive(self: CommandLine): bool  = self.running or self.fullscreen
     template requesting(self: CommandLine): bool = self.prompt != ""
+    template input_cap(self: CommandLine): int   = host.hlines - self.dir_feed().path_limited.runeLen - 2
 
     # --Methods goes here:
     proc scroll(self: CommandLine, shift: int) =
         origin = limit(origin + shift, log.len - host.vlines)
 
     proc loc(self: CommandLine, new_pos = 0) =
-        cpos = new_pos.limit input.runeLen
+        iorigin = min(iorigin, ipos)
+        ipos = new_pos.limit input.runeLen
 
     proc cut(self: CommandLine, idx = 0, amount = int.high): string {.discardable.} =
         let 
@@ -536,15 +538,15 @@ when not defined(CommandLine):
                 if not through_req:
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
                 else: cut()
-            elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut())        # Cut all chars.
-            elif KEY_Backspace.IsKeyDown:                    (if norepeat(): cut(cpos, 1)) # Cut last char.
-            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()        # Cancel request mode.
-            elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), cpos); abort()
+            elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut())          # Cut all chars.
+            elif KEY_Backspace.IsKeyDown:                    (if norepeat(): cut(ipos-1, 1)) # Cut prev char.
+            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()          # Cancel request mode.
+            elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), ipos); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
             elif KEY_KP_2.IsKeyPressed: exhume +1
-            elif KEY_KP_4.IsKeyDown: (if norepeat(): loc(cpos-1))
-            elif KEY_KP_6.IsKeyDown: (if norepeat(): loc(cpos+1))
-            elif key != 0: paste(key.Rune, cpos)
+            elif KEY_KP_4.IsKeyDown: (if norepeat(): loc(ipos-1))
+            elif KEY_KP_6.IsKeyDown: (if norepeat(): loc(ipos+1))
+            elif key != 0: paste(key.Rune, ipos)
         # Finalization.
         return self
 
@@ -560,15 +562,14 @@ when not defined(CommandLine):
         if self.requesting: host.write [prompt, if through_req: "\a\x09" else: "\a\x06"], BLACK, 
             if through_req: PURPLE else: ORANGE
         else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
-        let prefix_len = host.hpos() + 2 # 2 - for additonal symbol and pointer.
-        let full_len = prefix_len + input.runeLen
-        host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if full_len >= host.hlines: "…" else: " ",
-            if full_len >= host.hlines: input.runeSubstr(-(host.hlines-prefix_len-2)) else: input], Color(), BLACK
+        let overflow = input.runeLen >= self.input_cap
+        host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if overflow: "…" else: " ",
+            if overflow: input.runeSubstr(-self.input_cap) else: input], Color(), BLACK
         # Selection.
         let blink = getTime().toUnix %% 2 == 1
-        host.loc(host.hpos - (input.runeLen - cpos), host.vpos)
-        if cpos == input.runeLen: host.write (if blink: "_" else: "")
-        else: host.write input.runeAt(cpos).`$`, Black, Lime
+        host.loc(host.hpos - (input.runeLen - ipos), host.vpos)
+        if ipos == input.runeLen: host.write (if blink: "_" else: "")
+        else: host.write input.runeAtPos(ipos).`$`, Black, Lime
         host.write("\n")
         # Finalization.
         return self
