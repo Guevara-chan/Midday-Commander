@@ -563,12 +563,12 @@ when not defined(CommandLine):
             if through_req: PURPLE else: ORANGE
         else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
         let overflow = input.runeLen >= self.input_cap
-        host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if overflow: "…" else: " ",
+        host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if overflow and iorigin > 0: "…" else: " ",
             if overflow: input.runeSubstr(iorigin, self.input_cap-2) else: input], Color(), BLACK
-        if overflow: echo iorigin
+        #if overflow: echo iorigin
         # Selection.
         let blink = getTime().toUnix %% 2 == 1
-        host.loc(host.hpos - (input.runeLen - ipos), host.vpos)
+        host.loc(host.hpos - min(input.runeLen - ipos, self.input_cap-2), host.vpos)
         if ipos == input.runeLen: host.write (if blink: "_" else: "")
         else: host.write input.runeAtPos(ipos).`$`, Black, Lime
         host.write("\n")
