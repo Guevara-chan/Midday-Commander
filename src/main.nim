@@ -440,8 +440,8 @@ when not defined(CommandLine):
         origin = limit(origin + shift, log.len - host.vlines)
 
     proc loc(self: CommandLine, new_pos = 0) =
-        ipos = new_pos.limit input.runeLen
-        iorigin = if ipos >= iorigin + self.input_cap: ipos - self.input_cap + 1 else: min(iorigin, ipos)
+        ipos    = new_pos.limit input.runeLen
+        iorigin = ipos.limit input.runeLen - self.input_cap + 1
 
     proc cut(self: CommandLine, idx = 0, amount = int.high): string {.discardable.} =
         let 
