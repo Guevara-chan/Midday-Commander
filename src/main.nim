@@ -440,8 +440,8 @@ when not defined(CommandLine):
         origin = limit(origin + shift, log.len - host.vlines)
 
     proc loc(self: CommandLine, new_pos = 0) =
-        iorigin = if ipos >= iorigin + self.input_cap: ipos - self.iorigin + 1 else: min(iorigin, ipos)
         ipos = new_pos.limit input.runeLen
+        iorigin = if ipos >= iorigin + self.input_cap: ipos - self.input_cap + 1 else: min(iorigin, ipos)
 
     proc cut(self: CommandLine, idx = 0, amount = int.high): string {.discardable.} =
         let 
@@ -564,7 +564,8 @@ when not defined(CommandLine):
         else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
         let overflow = input.runeLen >= self.input_cap
         host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if overflow: "…" else: " ",
-            if overflow: input.runeSubstr(-self.input_cap+2) else: input], Color(), BLACK
+            if overflow: input.runeSubstr(iorigin, self.input_cap-2) else: input], Color(), BLACK
+        if overflow: echo iorigin
         # Selection.
         let blink = getTime().toUnix %% 2 == 1
         host.loc(host.hpos - (input.runeLen - ipos), host.vpos)
