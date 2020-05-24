@@ -547,6 +547,8 @@ when not defined(CommandLine):
             elif KEY_KP_2.IsKeyPressed: exhume +1
             elif KEY_KP_4.IsKeyDown: (if norepeat(): loc(ipos-1))
             elif KEY_KP_6.IsKeyDown: (if norepeat(): loc(ipos+1))
+            elif KEY_KP_7.IsKeyDown: loc(0)
+            elif KEY_KP_1.IsKeyDown: loc(input.runeLen-1)
             elif key != 0: paste(key.Rune, ipos)
         # Finalization.
         return self
@@ -565,7 +567,7 @@ when not defined(CommandLine):
         else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
         host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if iorigin > 0: "…" else: " ",
             if input.runeLen >= self.input_cap: input.runeSubstr(iorigin, self.input_cap-1) else: input, 
-                if iorigin < self.input_maxscroll: "…" else: ""], Color(), BLACK
+                if iorigin < self.input_maxscroll: "…" else: " "], Color(), BLACK
         # Selection.
         let blink = getTime().toUnix %% 2 == 1
         host.loc(host.hpos - min(input.runeLen - ipos, self.input_cap-1), host.vpos)
