@@ -434,6 +434,7 @@ when not defined(CommandLine):
     template exclusive(self: CommandLine): bool  = self.running or self.fullscreen
     template requesting(self: CommandLine): bool = self.prompt != ""
     template input_cap(self: CommandLine): int   = host.hlines - self.dir_feed().path_limited.runeLen - 2
+    template input_maxscroll(self: CommandLine): int = input.runeLen - self.input_cap + 1
 
     # --Methods goes here:
     proc scroll(self: CommandLine, shift: int) =
@@ -441,7 +442,7 @@ when not defined(CommandLine):
 
     proc loc(self: CommandLine, new_pos = 0) =
         ipos    = new_pos.limit input.runeLen
-        iorigin = ipos.limit input.runeLen - self.input_cap + 1
+        iorigin = ipos.limit self.input_maxscroll
 
     proc cut(self: CommandLine, idx = 0, amount = int.high): string {.discardable.} =
         let 
@@ -562,13 +563,12 @@ when not defined(CommandLine):
         if self.requesting: host.write [prompt, if through_req: "\a\x09" else: "\a\x06"], BLACK, 
             if through_req: PURPLE else: ORANGE
         else: host.write [dir_feed().path_limited, "\a\x03"], RAYWHITE, BLACK
-        let overflow = input.runeLen >= self.input_cap
-        host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if overflow and iorigin > 0: "…" else: " ",
-            if overflow: input.runeSubstr(iorigin, self.input_cap-2) else: input], Color(), BLACK
-        #if overflow: echo iorigin
+        host.write [if prompt.len > 0: "\x10" else: ">", "\a\x04", if iorigin > 0: "…" else: " ",
+            if input.runeLen >= self.input_cap: input.runeSubstr(iorigin, self.input_cap-1) else: input, 
+                if iorigin < self.input_maxscroll: "…" else: ""], Color(), BLACK
         # Selection.
         let blink = getTime().toUnix %% 2 == 1
-        host.loc(host.hpos - min(input.runeLen - ipos, self.input_cap-2), host.vpos)
+        host.loc(host.hpos - min(input.runeLen - ipos, self.input_cap-1), host.vpos)
         if ipos == input.runeLen: host.write (if blink: "_" else: "")
         else: host.write input.runeAtPos(ipos).`$`, Black, Lime
         host.write("\n")
