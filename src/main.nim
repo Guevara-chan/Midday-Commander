@@ -486,7 +486,7 @@ when not defined(CommandLine):
         backtrack = history.len
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
-        if not self.requesting: prompt = hint; input = def_input; prompt_cb = cb
+        if not self.requesting: cut(); prompt = hint; paste(def_input); prompt_cb = cb
 
     proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
         request hint, "", cb
@@ -548,7 +548,7 @@ when not defined(CommandLine):
             elif KEY_KP_4.IsKeyDown: (if norepeat(): loc(ipos-1))
             elif KEY_KP_6.IsKeyDown: (if norepeat(): loc(ipos+1))
             elif KEY_KP_7.IsKeyDown: loc(0)
-            elif KEY_KP_1.IsKeyDown: loc(input.runeLen-1)
+            elif KEY_KP_1.IsKeyDown: loc(input.runeLen)
             elif key != 0: paste(key.Rune, ipos)
         # Finalization.
         return self
@@ -570,7 +570,7 @@ when not defined(CommandLine):
                 if iorigin < self.input_maxscroll: "…" else: " "], Color(), BLACK
         # Selection.
         let blink = getTime().toUnix %% 2 == 1
-        host.loc(host.hpos - min(input.runeLen - ipos, self.input_cap-1), host.vpos)
+        host.loc(host.hpos - min(input.runeLen - ipos + 1, self.input_cap), host.vpos)
         if ipos == input.runeLen: host.write (if blink: "_" else: "")
         else: host.write input.runeAtPos(ipos).`$`, Black, Lime
         host.write("\n")
