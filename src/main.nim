@@ -535,21 +535,23 @@ when not defined(CommandLine):
                 elif KEY_Pause.IsKeyPressed:      (if self.running: shell.kill)
             if key != 0: shell.inputStream.write($(key.Rune))
         else: # Input controls.
+            let arr = toSeq(KEY_KP_0.int32..KEY_KP_EQUAL.int32)
             if KEY_Enter.IsKeyPressed: # Input actualization.
                 if not through_req:
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
                 else: cut()
             elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut())          # Cut all chars.
-            elif KEY_Backspace.IsKeyDown:                    (if norepeat(): cut(ipos-1, 1)) # Cut prev char.
             elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()          # Cancel request mode.
-            elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), ipos); abort()
-            elif KEY_KP_8.IsKeyPressed: exhume -1
-            elif KEY_KP_2.IsKeyPressed: exhume +1
-            elif KEY_KP_4.IsKeyDown:    (if norepeat(): loc(ipos-1))
-            elif KEY_KP_6.IsKeyDown:    (if norepeat(): loc(ipos+1))
-            elif KEY_KP_7.IsKeyPressed: loc(0)
-            elif KEY_KP_1.IsKeyPressed: loc(input.runeLen)
-            elif key != 0: paste(key.Rune, ipos)
+            elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), ipos); abort() # Paste clip.
+            elif KEY_Backspace.IsKeyDown: (if norepeat() and ipos > 0: cut(ipos-1, 1))       # Cut prev char.
+            elif KEY_KP_8.IsKeyPressed:   exhume -1                                          # Go back in history.
+            elif KEY_KP_2.IsKeyPressed:   exhume +1                                          # Go fwd in history.
+            elif KEY_KP_4.IsKeyDown:      (if norepeat(): loc(ipos-1))                       # Move cursor back.
+            elif KEY_KP_6.IsKeyDown:      (if norepeat(): loc(ipos+1))                       # Move cursor fwd.
+            elif KEY_KP_7.IsKeyPressed:   loc(0)                                             # Move cursor to start.
+            elif KEY_KP_1.IsKeyPressed:   loc(input.runeLen)                                 # Move cursor to end.
+            elif key != 0 and toSeq(KEY_KP_0.int32..KEY_KP_EQUAL.int32).filterIt(it.IsKeyPressed).len == 0: # ...Input
+                paste(key.Rune, ipos)
         # Finalization.
         return self
 
@@ -1145,7 +1147,7 @@ when not defined(MultiViewer):
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn(&"Are you sure want to overwrite \n{dest.extractFilename}\n") > 0:
                 let start = getTime()
-                if src.dirExists: src.transfer_dir(dest, destructive, tick)
+                if src.dirExists: self.next_viewer.dirty = true; src.transfer_dir(dest, destructive, tick)
                 else: tick(src); dest.removeFile; src.file_proc(dest)
                 return true
 
@@ -1436,7 +1438,7 @@ when not defined(MultiViewer):
 #.}
 
 # ==Main code==
-when isMainModule:    
+when isMainModule:
     let 
         win = newTerminalEmu("Midday Commander", "res/midday.png", 110, 33, colors.default_palette)
         supervisor = newMultiViewer(win, newDirViewer(win), newDirViewer(win))
