@@ -486,7 +486,7 @@ when not defined(CommandLine):
         backtrack = history.len
 
     proc request(self: CommandLine; hint, def_input: string; cb: proc(name: string)) =
-        if not self.requesting: cut(); prompt = hint; paste(def_input); prompt_cb = cb
+        if not self.requesting: cut(); paste(def_input); prompt = hint; prompt_cb = cb
 
     proc request(self: CommandLine, hint: string, cb: proc(name: string)) =
         request hint, "", cb
@@ -545,10 +545,10 @@ when not defined(CommandLine):
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), ipos); abort()
             elif KEY_KP_8.IsKeyPressed: exhume -1
             elif KEY_KP_2.IsKeyPressed: exhume +1
-            elif KEY_KP_4.IsKeyDown: (if norepeat(): loc(ipos-1))
-            elif KEY_KP_6.IsKeyDown: (if norepeat(): loc(ipos+1))
-            elif KEY_KP_7.IsKeyDown: loc(0)
-            elif KEY_KP_1.IsKeyDown: loc(input.runeLen)
+            elif KEY_KP_4.IsKeyDown:    (if norepeat(): loc(ipos-1))
+            elif KEY_KP_6.IsKeyDown:    (if norepeat(): loc(ipos+1))
+            elif KEY_KP_7.IsKeyPressed: loc(0)
+            elif KEY_KP_1.IsKeyPressed: loc(input.runeLen)
             elif key != 0: paste(key.Rune, ipos)
         # Finalization.
         return self
@@ -669,7 +669,7 @@ when not defined(ProgressWatch):
         # Status render.
         if status != "": host.with:
                 loc(0, 0)
-                write [operation, "\a\x0D│\a\x0A", status.fit_left(host.hlines)], Orange, DarkGray
+                write [operation, "\a\x00│\a\x0A", status.fit_left(host.hlines)], Orange, DarkGray
                 loc(host.hlines - ticks.`$`.len - 1, 0)
                 write ["│\a\x06", $ticks], Black
         # Timeline render.
