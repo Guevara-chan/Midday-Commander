@@ -574,9 +574,12 @@ when not defined(CommandLine):
                 if iorigin < self.input_maxscroll: "…" else: " "], Color(), BLACK
         # Selection.
         let blink = getTime().toUnix %% 2 == 1
+        var (fg, bg) = ((if replacing: Orange else: Green), Black)
         host.loc(host.hpos - min(input.runeLen - ipos + 1, self.input_cap), host.vpos)
-        if ipos == input.runeLen: host.write (if blink: "_" else: "")
-        else: host.write input.runeAtPos(ipos).`$`, Black, Lime
+        if ipos == input.runeLen: host.write (if blink: "_" else: ""), fg
+        else: 
+            if blink: swap fg, bg
+            host.write input.runeAtPos(ipos).`$`, fg, bg
         host.write("\n")
         # Finalization.
         return self
