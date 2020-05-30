@@ -423,7 +423,7 @@ when not defined(CommandLine):
         input, prompt: string
         log, history: seq[string]
         origin, backtrack, ipos, iorigin: int
-        fullscreen, through_req, input_changed: bool
+        fullscreen, through_req, input_changed, replacing: bool
     const 
         max_log  = 99999
         max_hist = 99999
@@ -540,17 +540,19 @@ when not defined(CommandLine):
                 if not through_req:
                     if self.requesting: prompt_cb(input); end_request(); abort() elif input != "": shell(); abort()
                 else: cut()
-            elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut())          # Cut all chars.
-            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()          # Cancel request mode.
+            elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut())       # Cut all chars.
+            elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()       # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), ipos); abort() # Paste clip.
-            elif KEY_Backspace.IsKeyDown: (if norepeat() and ipos > 0: cut(ipos-1, 1))       # Cut prev char.
-            elif KEY_KP_8.IsKeyPressed:   exhume -1                                          # Go back in history.
-            elif KEY_KP_2.IsKeyPressed:   exhume +1                                          # Go fwd in history.
-            elif KEY_KP_4.IsKeyDown:      (if norepeat(): loc(ipos-1))                       # Move cursor back.
-            elif KEY_KP_6.IsKeyDown:      (if norepeat(): loc(ipos+1))                       # Move cursor fwd.
-            elif KEY_KP_7.IsKeyPressed:   loc(0)                                             # Move cursor to start.
-            elif KEY_KP_1.IsKeyPressed:   loc(input.runeLen)                                 # Move cursor to end.
-            elif key != 0 and toSeq(KEY_KP_0.int32..KEY_KP_EQUAL.int32).filterIt(it.IsKeyPressed).len == 0: # ...Input
+            elif KEY_Backspace.IsKeyDown: (if norepeat() and ipos > 0: cut(ipos-1, 1))    # Cut prev char.
+            elif KEY_KP_8.IsKeyPressed:   exhume -1                                       # Go back in history.
+            elif KEY_KP_2.IsKeyPressed:   exhume +1                                       # Go fwd in history.
+            elif KEY_KP_4.IsKeyDown:      (if norepeat(): loc(ipos-1))                    # Move cursor back.
+            elif KEY_KP_6.IsKeyDown:      (if norepeat(): loc(ipos+1))                    # Move cursor fwd.
+            elif KEY_KP_7.IsKeyPressed:   loc(0)                                          # Move cursor to start.
+            elif KEY_KP_1.IsKeyPressed:   loc(input.runeLen)                              # Move cursor to end.
+            elif KEY_KP_0.IsKeyPressed:   replacing = not replacing                       # Insert/replace mode.
+            elif key != 0 and toSeq(KEY_KP_0.int32..KEY_KP_Equal.int32).filterIt(it.IsKeyPressed).len == 0: # ...Input
+                if ipos < input.runeLen and replacing: cut(ipos, 1)
                 paste(key.Rune, ipos)
         # Finalization.
         return self
