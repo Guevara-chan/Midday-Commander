@@ -543,6 +543,7 @@ when not defined(CommandLine):
             elif control_down() and KEY_Backspace.IsKeyDown: (if norepeat(): cut())       # Cut all chars.
             elif KEY_Pause.IsKeyPressed and self.requesting: end_request(); abort()       # Cancel request mode.
             elif shift_down() and KEY_Insert.IsKeyPressed:   paste(GetClipboardText(), ipos); abort() # Paste clip.
+            elif KEY_KP_Decimal.IsKeyDown:(if norepeat() and ipos < input.runeLen: cut(ipos, 1))      # Cut current chr
             elif KEY_Backspace.IsKeyDown: (if norepeat() and ipos > 0: cut(ipos-1, 1))    # Cut prev char.
             elif KEY_KP_8.IsKeyPressed:   exhume -1                                       # Go back in history.
             elif KEY_KP_2.IsKeyPressed:   exhume +1                                       # Go fwd in history.
@@ -1367,7 +1368,7 @@ when not defined(MultiViewer):
                 elif KEY_End.IsKeyPressed:            cmdline.paste(self.active.hpath)
                 elif KEY_KP_Add.IsKeyPressed:         request_sel_management()
                 elif KEY_KP_Subtract.IsKeyPressed:    request_sel_management(false)
-                elif KEY_KP_Decimal.IsKeyPressed:     self.active.chdir(direxit.name); cmdline.cut()
+                elif KEY_KP_Divide.IsKeyPressed:      self.active.chdir(direxit.name); cmdline.cut()
                 elif KEY_Right_Alt.IsKeyPressed:      switch_quick_search()
                 # Gamepad controls
                 elif 0.IsGamepadButtonPressed(GAMEPAD_BUTTON_RIGHT_TRIGGER_1): select(self.next_index)
