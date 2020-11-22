@@ -66,16 +66,16 @@ when not defined(Meta):
 
     proc truePath(path: string, follow_symlink = true): string =
         when defined(windows):
-            proc GetFinalPathNameByHandle(hFile:Handle, lpszFilePath:WideCStringObj, cchFilePath, dwFlags:int32):int32
+            proc GetFinalPathNameByHandle(hFile:Handle, lpszFilePath: WideCString, cchFilePath, dwFlags:int32):int32
                 {.stdcall, dynlib: "kernel32", discardable, importc: "GetFinalPathNameByHandleW".}
             let
                 handle = createFileW(newWideCString(path), 0'i32, 0'i32, nil, OPEN_EXISTING, 
                     FILE_FLAG_BACKUP_SEMANTICS or (FILE_FLAG_OPEN_REPARSE_POINT * (1-follow_symlink.int)), 0)
                 length = GetFinalPathNameByHandle(handle, newWideCString(" "), 0, 0)
-                buffer = newWideCString(" ".repeat(length))
+                buffer: WideCString = newWideCString(" ".repeat(length))
             defer: discard closeHandle(handle)
             if length == 0: return path
-            GetFinalPathNameByHandle(handle, buffer, len(buffer), 0)
+            GetFinalPathNameByHandle(handle, buffer, buffer.len, 0)
             return ($buffer).replace(r"\\?\", "")
         else: return expandSymlink path
 
@@ -1067,7 +1067,7 @@ when not defined(FileViewer):
                 write line.convert(srcEncoding=cmd_cp).fit_left(self.hcap+len_shift), self.fg, raw=self.hide_colors
                 write if fullscreen: "\n" else: rborder, self.brd_color
         # Footing render.
-        with(host):
+        with host:
             write if fullscreen: "╒" else: "╘"
             write "═".repeat(self.hcap - fullscreen.int * 2), self.brd_color, self.bg
             write if fullscreen: "╕" else: "╛"
@@ -1148,7 +1148,7 @@ when not defined(MultiViewer):
     proc navigate(self: MultiViewer, path: string) =
         discard self.active.chdir path
 
-    proc transfer(self: MultiViewer; src, dest: string; file_proc: proc(src, dest: string), destructive=false): bool =
+    proc transfer(self:MultiViewer; src, dest:string; file_proc: proc(src, dest:sink string), destructive=false):bool =
         proc tick(now_processing: string) = watcher.tick now_processing # aux binding.        
         if not (dest.fileExists or dest.dirExists) or # Checking if dest already exists.
             warn(&"Are you sure want to overwrite \n{dest.extractFilename}\n") > 0:

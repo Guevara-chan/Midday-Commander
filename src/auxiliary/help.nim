@@ -1,5 +1,5 @@
 const core_help* = [
-    "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.08",
+    "\a\x03>\a\x06Midday Commander\a\x05 retrofuturistic file manager v0.085",
     "\a\x03>\a\x05Developed in 2*20 by \a\x04Victoria A. Guevara",
     "\a\x01===================================================================================",
     "\a\x02ESC:\a\x01    switch between dir & console views OR deny alert choice OR cancel task",
